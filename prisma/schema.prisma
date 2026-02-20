@@ -1,0 +1,194 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js adapter models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  groupMembers GroupMember[]
+  paidExpenses ExpensePayer[]
+  splits       ExpenseSplit[]
+  settlements  Settlement[]   @relation("SettlementPayer")
+  receivables  Settlement[]   @relation("SettlementPayee")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Application models
+// ---------------------------------------------------------------------------
+
+enum SplitMode {
+  EQUAL
+  PERCENTAGE
+  SHARES
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  currency    String   @default("USD")
+  inviteToken String   @unique @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members  GroupMember[]
+  expenses Expense[]
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  userId   String
+  role     String   @default("member") // "admin" | "member"
+  joinedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model Expense {
+  id                 String    @id @default(cuid())
+  groupId            String
+  description        String
+  amount             Decimal   @db.Decimal(14, 4)
+  currency           String
+  fxRate             Decimal?  @db.Decimal(18, 6)
+  baseCurrencyAmount Decimal?  @db.Decimal(14, 4)
+  splitMode          SplitMode @default(EQUAL)
+  date               DateTime
+  notes              String?
+  receiptUrl         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  group       Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payers      ExpensePayer[]
+  splits      ExpenseSplit[]
+  attachments Attachment[]
+}
+
+model ExpensePayer {
+  id        String  @id @default(cuid())
+  expenseId String
+  userId    String
+  amount    Decimal @db.Decimal(14, 4)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, userId])
+}
+
+model ExpenseSplit {
+  id         String   @id @default(cuid())
+  expenseId  String
+  userId     String
+  amount     Decimal  @db.Decimal(14, 4)
+  percentage Decimal? @db.Decimal(7, 4)
+  shares     Int?
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, userId])
+}
+
+model Settlement {
+  id        String    @id @default(cuid())
+  groupId   String
+  payerId   String
+  payeeId   String
+  amount    Decimal   @db.Decimal(14, 4)
+  currency  String
+  notes     String?
+  date      DateTime
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  payer User @relation("SettlementPayer", fields: [payerId], references: [id])
+  payee User @relation("SettlementPayee", fields: [payeeId], references: [id])
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  expenseId   String
+  fileName    String
+  contentType String
+  blobUrl     String
+  sizeBytes   Int
+  uploadedAt  DateTime @default(now())
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+}
+
+model ExchangeRate {
+  id         String   @id @default(cuid())
+  fromCcy    String
+  toCcy      String
+  rate       Decimal  @db.Decimal(18, 6)
+  source     String
+  recordedAt DateTime @default(now())
+
+  @@index([fromCcy, toCcy, recordedAt])
+}
