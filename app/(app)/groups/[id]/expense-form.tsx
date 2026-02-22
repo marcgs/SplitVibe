@@ -77,8 +77,6 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-      <h3 className="text-base font-medium">Add Expense</h3>
-
       <div>
         <label
           htmlFor="expense-title"
