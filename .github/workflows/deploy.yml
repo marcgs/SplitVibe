@@ -41,11 +41,14 @@ jobs:
           resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
           imageToDeploy: ${{ secrets.ACR_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-      - name: Run Prisma migrations
-        uses: azure/cli@v2
+      - uses: actions/setup-node@v4
         with:
-          inlineScript: |
-            az containerapp exec \
-              --name "${{ secrets.CONTAINER_APP_NAME }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-              --command "npx prisma migrate deploy"
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run Prisma migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
