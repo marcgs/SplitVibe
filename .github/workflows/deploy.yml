@@ -12,6 +12,9 @@ env:
   ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
   IMAGE_NAME: splitvibe
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
