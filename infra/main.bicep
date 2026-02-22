@@ -35,6 +35,9 @@ param nextAuthSecret string
 @description('Container image to deploy (defaults to quickstart placeholder)')
 param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
+@description('Public application URL for Auth.js (update after initial deployment with actual FQDN)')
+param appUrl string = ''
+
 // ── Derived names ───────────────────────────────────────────────────────────
 
 var suffix = uniqueString(subscription().subscriptionId, environment, baseName)
@@ -158,7 +161,7 @@ module containerApps 'modules/containerApps.bicep' = {
     storageAccountNameSecretUri: keyVault.outputs.storageAccountNameSecretUri
     storageAccountKeySecretUri: keyVault.outputs.storageAccountKeySecretUri
     storageConnectionStringSecretUri: keyVault.outputs.storageConnectionStringSecretUri
-    appUrl: 'https://${containerAppName}.${location}.azurecontainerapps.io'
+    appUrl: appUrl
   }
 }
 
