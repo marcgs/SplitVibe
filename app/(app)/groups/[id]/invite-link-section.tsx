@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function InviteLinkSection({
   groupId,
@@ -12,8 +12,13 @@ export default function InviteLinkSection({
   const [token, setToken] = useState(inviteToken);
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [origin, setOrigin] = useState("");
 
-  const inviteUrl = `${window.location.origin}/join/${token}`;
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const inviteUrl = origin ? `${origin}/join/${token}` : "";
 
   async function handleCopy() {
     await navigator.clipboard.writeText(inviteUrl);
