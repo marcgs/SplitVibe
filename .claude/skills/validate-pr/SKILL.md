@@ -31,11 +31,16 @@ A pull request number or URL from the **marcgs/SplitVibe** repository.
 
 ### 2. Classify each acceptance criterion
 
-For every acceptance criterion, classify it into a **validation strategy**:
+For every acceptance criterion, assign **one or more** validation
+strategies. A single criterion can (and often should) be validated
+through multiple complementary strategies.
 
-- **🌐 Browser (E2E)** — Criterion involves UI (pages, forms,
-  navigation, toasts, modals). Validate with Playwright MCP browser
-  tools against `http://localhost:3000`.
+Available strategies:
+
+- **🌐 Browser (E2E)** — Criterion has **any** observable UI impact:
+  pages, forms, navigation, lists, toasts, modals, visual feedback.
+  Validate with Playwright MCP browser tools against
+  `http://localhost:3000`.
 - **🔌 API** — Criterion involves HTTP endpoints (status codes,
   response shapes, auth guards). Validate with `curl`/`fetch`
   against `http://localhost:3000/api/…`.
@@ -48,6 +53,15 @@ For every acceptance criterion, classify it into a **validation strategy**:
 - **📄 Code review** — Criterion involves code quality, patterns, or
   architectural constraints. Inspect the PR diff and run
   `npm run typecheck` and `npm run lint`.
+
+> **🌐 Browser-first rule:** If a criterion mentions user-visible
+> behavior — submitting a form, seeing a list, viewing data on a page,
+> receiving feedback, navigating between views — it **MUST** include
+> 🌐 Browser (E2E) as a strategy, even if unit tests also cover the
+> underlying logic. Unit or integration tests alone are **never** a
+> substitute for browser validation of UI-facing criteria.
+> Passing unit tests does not verify that the UI renders correctly,
+> handles user interaction, or integrates end-to-end.
 
 ### 3. Confirm prerequisites
 
@@ -64,6 +78,11 @@ Before running validations, check what's needed:
 
 Only stop for the strategies that are blocked — continue validating criteria
 that have their prerequisites met.
+
+> **Important:** If 🌐 Browser validation is required for a criterion
+> (per the browser-first rule) but the dev server is unreachable,
+> mark that criterion as ⏭️ **Blocked (browser)** in the report.
+> Do NOT silently downgrade it to unit tests only.
 
 ### 4. Validate each criterion
 
@@ -120,12 +139,12 @@ Execute each criterion using its assigned strategy:
 
 | # | Criterion | Strategy | Result | Notes |
 |---|-----------|----------|--------|-------|
-| 1 | <text> | 🌐 Browser | ✅ PASS | Screenshot: <ref> |
+| 1 | <text> | 🌐 Browser + 🧪 Unit | ✅ PASS | Screenshot: <ref>, 3/3 tests pass |
 | 2 | <text> | 🔌 API | ❌ FAIL | Expected 201, got 500 |
 | 3 | <text> | 🧪 Unit test | ✅ PASS | 5/5 passed |
 | 4 | <text> | 🛠️ CLI | ✅ PASS | Exit code 0 |
 | 5 | <text> | 📄 Review | ✅ PASS | Typecheck clean |
-| 6 | <text> | 🧪 Unit test | ⚠️ GAP | No test coverage |
+| 6 | <text> | 🌐 Browser + 🧪 Unit | ⏭️ BLOCKED | Browser: dev server down; Unit: 2/2 pass |
 
 ### Summary
 
