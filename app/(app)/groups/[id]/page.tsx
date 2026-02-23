@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { calculateBalances, simplifyDebts } from "@/lib/balances";
+import type { ExpenseData, SettlementData } from "@/lib/balances";
 import Link from "next/link";
 import InviteLinkSection from "./invite-link-section";
 import ExpenseForm from "./expense-form";
@@ -30,6 +32,9 @@ export default async function GroupDetailPage({
           payers: {
             include: { user: { select: { id: true, name: true, email: true } } },
           },
+          splits: {
+            include: { user: { select: { id: true, name: true, email: true } } },
+          },
         },
         orderBy: { date: "desc" },
       },
@@ -46,6 +51,38 @@ export default async function GroupDetailPage({
   }
 
   const isAdmin = currentMember.role === "admin";
+
+  // Fetch settlements for balance calculation
+  const settlements = await db.settlement.findMany({
+    where: { groupId: id, deletedAt: null },
+    select: { payerId: true, payeeId: true, amount: true },
+  });
+
+  // Compute balances and simplified debts
+  const expenseData: ExpenseData[] = group.expenses.map((e) => ({
+    payers: e.payers.map((p) => ({
+      userId: p.userId,
+      amount: Number(p.amount),
+    })),
+    splits: e.splits.map((s) => ({
+      userId: s.userId,
+      amount: Number(s.amount),
+    })),
+  }));
+
+  const settlementData: SettlementData[] = settlements.map((s) => ({
+    payerId: s.payerId,
+    payeeId: s.payeeId,
+    amount: Number(s.amount),
+  }));
+
+  const balancesMap = calculateBalances(expenseData, settlementData);
+  const simplifiedDebts = simplifyDebts(balancesMap);
+
+  // Build a name lookup from member data
+  const memberNames = new Map(
+    group.members.map((m) => [m.userId, m.user.name ?? m.user.email])
+  );
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
@@ -112,6 +149,38 @@ export default async function GroupDetailPage({
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Balances Section */}
+        <section className="mt-8">
+          <h2 className="mb-4 text-lg font-medium">Balances</h2>
+          {simplifiedDebts.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              All settled up! No outstanding balances.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {simplifiedDebts.map((debt, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <div className="text-sm">
+                    <span className="font-medium">
+                      {memberNames.get(debt.from) ?? debt.from}
+                    </span>
+                    {" owes "}
+                    <span className="font-medium">
+                      {memberNames.get(debt.to) ?? debt.to}
+                    </span>
+                  </div>
+                  <div className="text-sm font-semibold">
+                    ${debt.amount.toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Add Expense Section */}
