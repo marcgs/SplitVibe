@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import InviteLinkSection from "./invite-link-section";
+import ExpenseForm from "./expense-form";
 
 export default async function GroupDetailPage({
   params,
@@ -22,6 +23,15 @@ export default async function GroupDetailPage({
       members: {
         include: { user: { select: { id: true, name: true, email: true, image: true } } },
         orderBy: { joinedAt: "asc" },
+      },
+      expenses: {
+        where: { deletedAt: null },
+        include: {
+          payers: {
+            include: { user: { select: { id: true, name: true, email: true } } },
+          },
+        },
+        orderBy: { date: "desc" },
       },
     },
   });
@@ -102,6 +112,49 @@ export default async function GroupDetailPage({
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Add Expense Section */}
+        <section className="mt-8">
+          <h2 className="mb-4 text-lg font-medium">Add Expense</h2>
+          <ExpenseForm
+            groupId={group.id}
+            members={group.members}
+            currentUserId={session.user.id}
+          />
+        </section>
+
+        {/* Expenses List Section */}
+        <section className="mt-8">
+          <h2 className="mb-4 text-lg font-medium">
+            Expenses ({group.expenses.length})
+          </h2>
+          {group.expenses.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No expenses yet. Add one above!
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {group.expenses.map((expense) => (
+                <div
+                  key={expense.id}
+                  className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{expense.description}</div>
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Paid by{" "}
+                      {expense.payers[0]?.user.name ?? expense.payers[0]?.user.email ?? "Unknown"}{" "}
+                      · {new Date(expense.date).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold">
+                    ${Number(expense.amount).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>
