@@ -488,8 +488,8 @@ describe("POST /api/groups/[id]/expenses", () => {
     const carol = splits.find((s: { userId: string }) => s.userId === "user-3");
 
     // Alice gets remainder (first alphabetically, payer not in split)
-    expect(alice.amount).toBe(3.34); // floor(1000/3) = 333 cents + 1 remainder = 334 = $3.34
-    expect(carol.amount).toBe(6.66); // floor(1000*2/3) = 666 cents = $6.66
+    expect(alice.amount).toBeCloseTo(3.34, 2); // floor(1000/3) = 333 cents + 1 remainder = 334 = $3.34
+    expect(carol.amount).toBeCloseTo(6.66, 2); // floor(1000*2/3) = 666 cents = $6.66
     expect(alice.amount + carol.amount).toBeCloseTo(10, 2);
   });
 
