@@ -6,6 +6,8 @@ import type { ExpenseData, SettlementData } from "@/lib/balances";
 import Link from "next/link";
 import InviteLinkSection from "./invite-link-section";
 import ExpenseForm from "./expense-form";
+import SettlementForm from "./settlement-form";
+import DeleteSettlementButton from "./delete-settlement-button";
 
 export default async function GroupDetailPage({
   params,
@@ -52,10 +54,14 @@ export default async function GroupDetailPage({
 
   const isAdmin = currentMember.role === "admin";
 
-  // Fetch settlements for balance calculation
+  // Fetch settlements for balance calculation and display
   const settlements = await db.settlement.findMany({
     where: { groupId: id, deletedAt: null },
-    select: { payerId: true, payeeId: true, amount: true },
+    include: {
+      payer: { select: { id: true, name: true, email: true } },
+      payee: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { date: "desc" },
   });
 
   // Compute balances and simplified debts
@@ -219,6 +225,61 @@ export default async function GroupDetailPage({
                   </div>
                   <div className="text-sm font-semibold">
                     ${Number(expense.amount).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Record Settlement Section */}
+        <section className="mt-8">
+          <h2 className="mb-4 text-lg font-medium">Record Settlement</h2>
+          <SettlementForm
+            groupId={group.id}
+            members={group.members}
+            currentUserId={session.user.id}
+          />
+        </section>
+
+        {/* Settlements List Section */}
+        <section className="mt-8">
+          <h2 className="mb-4 text-lg font-medium">
+            Settlements ({settlements.length})
+          </h2>
+          {settlements.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No settlements recorded yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {settlements.map((settlement) => (
+                <div
+                  key={settlement.id}
+                  className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <div className="flex-1">
+                    <div className="text-sm">
+                      <span className="font-medium">
+                        {settlement.payer.name ?? settlement.payer.email}
+                      </span>
+                      {" paid "}
+                      <span className="font-medium">
+                        {settlement.payee.name ?? settlement.payee.email}
+                      </span>
+                    </div>
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {new Date(settlement.date).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm font-semibold">
+                      ${Number(settlement.amount).toFixed(2)}
+                    </div>
+                    <DeleteSettlementButton
+                      settlementId={settlement.id}
+                      createdAt={settlement.createdAt}
+                    />
                   </div>
                 </div>
               ))}
