@@ -51,7 +51,20 @@ Available strategies:
 > shapes, status codes, or auth guards — never a substitute for
 > browser testing of UI-facing criteria.
 
-### 3. Start a clean dev environment
+### 3. Check out the PR branch in a worktree
+
+Use a **git worktree** so the user's current checkout is not disturbed.
+
+- Extract the **head branch name** from the PR metadata fetched in step 1.
+- Remove any stale worktree from a previous run:
+  `git worktree remove ../splitvibe-validate --force 2>/dev/null`
+- Create the worktree:
+  `git worktree add ../splitvibe-validate <branch>`
+- **`cd ../splitvibe-validate`** — all subsequent commands (npm install,
+  prisma, npm run dev, docker compose) run from this directory.
+- `npm install` — ensure dependencies are up to date for this branch.
+
+### 4. Start a clean dev environment
 
 Always start from a **clean slate** to avoid stale state, old code, or
 leftover data from previous runs.
@@ -72,11 +85,11 @@ leftover data from previous runs.
 5. **Wait for the server to be ready:**
    - Poll `curl -sf http://localhost:3000` with retries (up to ~30 s).
    - If it still fails after retries, mark all criteria as
-     ⏭️ **Blocked** and skip to step 6 (report).
+     ⏭️ **Blocked** and skip to step 7 (report).
 
 Only proceed to validation once the dev server is reachable.
 
-### 4. Validate each criterion
+### 5. Validate each criterion
 
 Execute each criterion using its assigned strategy:
 
@@ -96,13 +109,13 @@ Execute each criterion using its assigned strategy:
 3. Assert: status code, response body shape, error messages, headers.
 4. For authenticated endpoints, include the session token/cookie if available.
 
-### 5. On failure
+### 6. On failure
 
 - Record the failing assertion, evidence (screenshot or terminal output), and
   context (URL, command, test name).
 - **Continue** with remaining criteria — do not abort the entire run.
 
-### 6. Report results
+### 7. Report results
 
 ```markdown
 ## Validation Report — PR #<number>
@@ -128,7 +141,7 @@ Execute each criterion using its assigned strategy:
 - ✅ **All acceptance criteria for this PR are verified.**
 - ❌ **Some acceptance criteria failed validation. See details above.**
 
-### 7. Post results to the PR
+### 8. Post results to the PR
 
 After producing the validation report, **post it as a comment on the
 PR in GitHub**. Use the GitHub API (or the available GitHub MCP tools)
@@ -141,9 +154,12 @@ step 6.
   conclusion so that reviewers can see the validation status directly
   in the PR timeline without re-running the agent.
 
-### 8. Tear down the dev environment
+### 9. Tear down the dev environment
 
 After posting results, **always** clean up:
 
 1. Stop the Next.js dev server (kill the process on port 3000).
 2. `docker compose down -v` — stop and remove all containers and volumes.
+3. `cd` back to the original repository root.
+4. `git worktree remove ../splitvibe-validate --force` — remove the
+   temporary worktree.
