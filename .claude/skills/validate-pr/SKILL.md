@@ -63,26 +63,38 @@ Available strategies:
 > Passing unit tests does not verify that the UI renders correctly,
 > handles user interaction, or integrates end-to-end.
 
-### 3. Confirm prerequisites
+### 3. Start a clean dev environment
 
-Before running validations, check what's needed:
+Always start from a **clean slate** to avoid stale state, old code, or
+leftover data from previous runs.
 
-- **For 🌐 Browser or 🔌 API criteria:** use `browser_navigate` to reach
-  `http://localhost:3000`. If unreachable, tell the user:
-  > Dev server is not running. Please start it with `npm run dev` or
-  > `docker compose --profile full up` and re-run this agent.
+1. **Tear down anything already running:**
+   - Kill any process on port 3000
+     (`lsof -ti:3000 | xargs kill 2>/dev/null`).
+   - `docker compose down -v` — stop and remove all containers and
+     volumes.
+2. **Start backend services:**
+   - `docker compose up -d db storage` — start Postgres and Azurite.
+   - Wait for Postgres to be ready
+     (`docker compose exec db pg_isready -U postgres`; retry if needed).
+3. **Apply migrations:**
+   - `npx prisma migrate dev` — apply pending migrations to a fresh DB.
+4. **Start the Next.js dev server** (async/detached so it keeps running):
+   - `npm run dev`
+5. **Wait for the server to be ready:**
+   - Poll `curl -sf http://localhost:3000` with retries (up to ~30 s).
+   - If it still fails after retries, mark browser/API criteria as
+     ⏭️ **Blocked** and continue with other strategies.
+
+**Additional prerequisites:**
+
 - **For 🧪 Unit/Integration criteria:** verify `node_modules` exists
   (run `npm ls vitest` to confirm).
-- **For 🛠️ CLI/Infrastructure criteria:** verify Docker is running if
-  database access is needed (`docker compose ps`).
+- **For 🛠️ CLI/Infrastructure criteria:** the Docker services started
+  above cover database access.
 
 Only stop for the strategies that are blocked — continue validating criteria
 that have their prerequisites met.
-
-> **Important:** If 🌐 Browser validation is required for a criterion
-> (per the browser-first rule) but the dev server is unreachable,
-> mark that criterion as ⏭️ **Blocked (browser)** in the report.
-> Do NOT silently downgrade it to unit tests only.
 
 ### 4. Validate each criterion
 
@@ -173,3 +185,10 @@ step 6.
 - The comment should contain the complete report table, summary, and
   conclusion so that reviewers can see the validation status directly
   in the PR timeline without re-running the agent.
+
+### 8. Tear down the dev environment
+
+After posting results, **always** clean up:
+
+1. Stop the Next.js dev server (kill the process on port 3000).
+2. `docker compose down -v` — stop and remove all containers and volumes.
