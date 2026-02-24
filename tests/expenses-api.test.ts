@@ -289,6 +289,245 @@ describe("POST /api/groups/[id]/expenses", () => {
     );
     expect(res.status).toBe(401);
   });
+
+  it("splits $90 by percentage: Alice 50%, Bob 30%, Carol 20% → $45, $27, $18", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+        splitMode: "PERCENTAGE",
+        percentages: { "user-1": 50, "user-2": 30, "user-3": 20 },
+      }),
+      defaultParams
+    );
+
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    const splits = createCall.data.splits.create;
+    expect(splits).toHaveLength(3);
+
+    const alice = splits.find((s: { userId: string }) => s.userId === "user-1");
+    const bob = splits.find((s: { userId: string }) => s.userId === "user-2");
+    const carol = splits.find((s: { userId: string }) => s.userId === "user-3");
+
+    expect(alice.amount).toBe(45);
+    expect(bob.amount).toBe(27);
+    expect(carol.amount).toBe(18);
+  });
+
+  it("stores percentage values on splits for percentage mode", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+        splitMode: "PERCENTAGE",
+        percentages: { "user-1": 50, "user-2": 30, "user-3": 20 },
+      }),
+      defaultParams
+    );
+
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    expect(createCall.data.splitMode).toBe("PERCENTAGE");
+    const splits = createCall.data.splits.create;
+    const alice = splits.find((s: { userId: string }) => s.userId === "user-1");
+    expect(alice.percentage).toBe(50);
+  });
+
+  it("returns 400 when percentages do not sum to 100%", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+
+    const res = await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+        splitMode: "PERCENTAGE",
+        percentages: { "user-1": 50, "user-2": 30, "user-3": 10 },
+      }),
+      defaultParams
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toMatch(/100/);
+  });
+
+  it("splits $90 by shares 2/1/1 → $45, $22.50, $22.50", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+        splitMode: "SHARES",
+        shares: { "user-1": 2, "user-2": 1, "user-3": 1 },
+      }),
+      defaultParams
+    );
+
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    const splits = createCall.data.splits.create;
+    expect(splits).toHaveLength(3);
+
+    const alice = splits.find((s: { userId: string }) => s.userId === "user-1");
+    const bob = splits.find((s: { userId: string }) => s.userId === "user-2");
+    const carol = splits.find((s: { userId: string }) => s.userId === "user-3");
+
+    expect(alice.amount).toBe(45);
+    expect(bob.amount).toBe(22.5);
+    expect(carol.amount).toBe(22.5);
+  });
+
+  it("stores share values on splits for shares mode", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+        splitMode: "SHARES",
+        shares: { "user-1": 2, "user-2": 1, "user-3": 1 },
+      }),
+      defaultParams
+    );
+
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    expect(createCall.data.splitMode).toBe("SHARES");
+    const splits = createCall.data.splits.create;
+    const alice = splits.find((s: { userId: string }) => s.userId === "user-1");
+    expect(alice.shares).toBe(2);
+  });
+
+  it("assigns rounding remainder to payer when payer is a split participant (percentage)", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    // $10 split: Alice 33.34%, Bob 33.33%, Carol 33.33%
+    // Floor cents: 333 + 333 + 333 = 999, remainder 1 cent → goes to payer (Alice)
+    await POST(
+      jsonRequest({
+        title: "Snack",
+        amount: 10,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+        splitMode: "PERCENTAGE",
+        percentages: { "user-1": 33.34, "user-2": 33.33, "user-3": 33.33 },
+      }),
+      defaultParams
+    );
+
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    const splits = createCall.data.splits.create;
+    const alice = splits.find((s: { userId: string }) => s.userId === "user-1");
+    const bob = splits.find((s: { userId: string }) => s.userId === "user-2");
+    const carol = splits.find((s: { userId: string }) => s.userId === "user-3");
+
+    // Alice (payer & participant) should get the remainder
+    expect(alice.amount + bob.amount + carol.amount).toBeCloseTo(10, 2);
+    expect(alice.amount).toBeGreaterThanOrEqual(bob.amount);
+  });
+
+  it("assigns rounding remainder to first alphabetically when payer is not a split participant (shares)", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    // $10, paidBy Bob (not in splitAmong), splitAmong: Alice + Carol, shares 1/2
+    // Alice: floor(1000*1/3)=333, Carol: floor(1000*2/3)=666, total=999, remainder=1
+    // Payer not in split → remainder to first alphabetically (Alice)
+    await POST(
+      jsonRequest({
+        title: "Snack",
+        amount: 10,
+        paidBy: "user-2",
+        splitAmong: ["user-1", "user-3"],
+        date: "2025-06-15",
+        splitMode: "SHARES",
+        shares: { "user-1": 1, "user-3": 2 },
+      }),
+      defaultParams
+    );
+
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    const splits = createCall.data.splits.create;
+    const alice = splits.find((s: { userId: string }) => s.userId === "user-1");
+    const carol = splits.find((s: { userId: string }) => s.userId === "user-3");
+
+    // Alice gets remainder (first alphabetically, payer not in split)
+    expect(alice.amount).toBe(3.34); // floor(1000/3) = 333 cents + 1 remainder = 334 = $3.34
+    expect(carol.amount).toBe(6.66); // floor(1000*2/3) = 666 cents = $6.66
+    expect(alice.amount + carol.amount).toBeCloseTo(10, 2);
+  });
+
+  it("returns 400 when splitMode is PERCENTAGE but percentages are missing", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+
+    const res = await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2"],
+        date: "2025-06-15",
+        splitMode: "PERCENTAGE",
+      }),
+      defaultParams
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when splitMode is SHARES but shares are missing", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+
+    const res = await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2"],
+        date: "2025-06-15",
+        splitMode: "SHARES",
+      }),
+      defaultParams
+    );
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("GET /api/groups/[id]/expenses", () => {
