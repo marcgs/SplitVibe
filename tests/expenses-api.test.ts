@@ -509,7 +509,9 @@ describe("POST /api/groups/[id]/expenses", () => {
     mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
     mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
 
-    // $10 split with shares 1/1 between Bob and Carol, payer is Alice (not a participant)
+    // $10 split with shares 1/2 between Bob and Carol, payer is Alice (not a participant)
+    // Bob: floor(1000 * 1/3) = 333, Carol: floor(1000 * 2/3) = 666, sum=999, remainder=1
+    // Alice is payer but not participant → Bob (first alphabetically) gets remainder
     await POST(
       jsonRequest({
         title: "Snack",
@@ -518,7 +520,7 @@ describe("POST /api/groups/[id]/expenses", () => {
         splitAmong: ["user-2", "user-3"],
         date: "2025-06-15",
         splitMode: "SHARES",
-        shares: { "user-2": 1, "user-3": 1 },
+        shares: { "user-2": 1, "user-3": 2 },
       }),
       defaultParams
     );
@@ -529,9 +531,9 @@ describe("POST /api/groups/[id]/expenses", () => {
     const bob = splits.find((s: { userId: string }) => s.userId === "user-2");
     const carol = splits.find((s: { userId: string }) => s.userId === "user-3");
 
-    // Alice is payer but not a participant; Bob is first alphabetically → Bob gets remainder
-    expect(bob.amount).toBe(5);
-    expect(carol.amount).toBe(5);
+    // Bob gets remainder since payer (Alice) is not a participant
+    expect(bob.amount).toBe(3.34);
+    expect(carol.amount).toBe(6.66);
   });
 });
 
