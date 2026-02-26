@@ -424,12 +424,8 @@ describe("POST /api/groups/[id]/expenses", () => {
     mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
     mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
 
-    // $100 split 33.33%/33.33%/33.34% — 33.33% of 10000 cents = 3333 cents each
-    // floor(0.3333 * 10000) = 3333, floor(0.3333 * 10000) = 3333, floor(0.3334 * 10000) = 3334
-    // total assigned = 10000, remainder = 0 — use a case that forces remainder
-    // $10 split 33.33%/33.33%/33.34%
-    // floor(0.3333 * 1000) = 333, floor(0.3333 * 1000) = 333, floor(0.3334 * 1000) = 333
-    // total = 999, remainder = 1 cent → goes to payer (user-2 = Bob)
+    // $10 split 33.33%/33.33%/33.34%: floor gives 333+333+333=999 cents
+    // remainder 1 cent → goes to payer (user-2 = Bob)
     await POST(
       jsonRequest({
         title: "Lunch",
@@ -460,9 +456,7 @@ describe("POST /api/groups/[id]/expenses", () => {
     mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
     mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
 
-    // user-1 (Alice) pays, but split only among Bob and Carol with weights 1/1
-    // $1 / 2 = 50 cents each, no remainder here
-    // Use $1 with weights 1/2 → floor(1/3 * 100) = 33, floor(2/3 * 100) = 66, total=99, remainder=1
+    // $1 with weights 1/2 → floor(1/3 * 100)=33, floor(2/3 * 100)=66, total=99, remainder=1
     // Payer (Alice/user-1) is NOT a participant → remainder goes to first alphabetically = Bob
     await POST(
       jsonRequest({
