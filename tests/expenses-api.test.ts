@@ -423,13 +423,9 @@ describe("POST /api/groups/[id]/expenses", () => {
     mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
     mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
 
-    // Alice pays $100, split among Bob and Carol with shares 1/1/1 (3 users)
-    // Use 3 participants: Bob, Carol + a third; but we only have 3 members total.
-    // $100 among Bob(1), Carol(1) with a third share won't work with 2 people.
-    // Use shares 1/1/1 among all three but payer is someone NOT in the split.
-    // Actually test with percentage: 33.33%, 33.33%, 33.34% among Bob, Carol, Alice
-    // Better: use equal split among Bob and Carol where payer is Alice
-    // $10 among Bob(1) and Carol(2) with shares → $3.33 and $6.66, 1 cent remainder → Bob (first alphabetically)
+    // $10 split between Bob (1 share) and Carol (2 shares), Alice is the payer (not a participant)
+    // Bob: floor($10 * 1/3) = $3.33, Carol: floor($10 * 2/3) = $6.66
+    // Total: $9.99, 1 cent remainder → Bob (first alphabetically, since payer is not in split)
     await POST(
       jsonRequest({
         title: "Lunch",
@@ -466,7 +462,7 @@ describe("POST /api/groups/[id]/expenses", () => {
     mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
     mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
 
-    // $100 / 3 = $33.33 each, 1 cent remainder → goes to Bob (payer, participant)
+    // $100 split 3 ways: each gets floor($33.33) = $33.33, 1 cent remainder → goes to Bob (payer, participant)
     await POST(
       jsonRequest({
         title: "Lunch",
