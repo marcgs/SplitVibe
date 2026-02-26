@@ -11,7 +11,56 @@ const createExpenseSchema = z.object({
   date: z.string().refine((v) => !isNaN(Date.parse(v)), {
     message: "Invalid date",
   }),
+  splitMode: z.enum(["EQUAL", "PERCENTAGE", "SHARES"]).optional().default("EQUAL"),
+  percentages: z.record(z.string(), z.number()).optional(),
+  shares: z.record(z.string(), z.number().int().positive()).optional(),
 });
+
+/**
+ * Apply rounding rule: floor each amount to cents, then distribute remainder.
+ * Remainder goes to the payer if they are a split participant, otherwise to
+ * the first participant alphabetically (participants are already sorted).
+ */
+function applyRounding(
+  rawCents: { userId: string; cents: number }[],
+  totalCents: number,
+  payerId: string,
+  splitAmong: string[]
+): { userId: string; amount: number }[] {
+  const floored = rawCents.map((r) => ({
+    userId: r.userId,
+    cents: Math.floor(r.cents),
+  }));
+
+  const distributed = floored.reduce((s, r) => s + r.cents, 0);
+  let remainder = totalCents - distributed;
+
+  // Determine who gets the remainder
+  const payerIsParticipant = splitAmong.includes(payerId);
+
+  if (payerIsParticipant) {
+    // Give all remainder to payer
+    const payerEntry = floored.find((r) => r.userId === payerId);
+    if (payerEntry) {
+      payerEntry.cents += remainder;
+      remainder = 0;
+    }
+  }
+
+  // If payer was not a participant, distribute 1 cent at a time to participants
+  // in alphabetical order (they are already sorted)
+  if (remainder > 0) {
+    for (let i = 0; remainder > 0 && i < floored.length; i++) {
+      floored[i].cents += 1;
+      remainder--;
+    }
+  }
+
+  return floored.map((r) => ({
+    userId: r.userId,
+    amount: r.cents / 100,
+  }));
+}
 
 export async function POST(
   request: Request,
@@ -50,7 +99,7 @@ export async function POST(
     );
   }
 
-  const { title, amount, paidBy, splitAmong, date } = parsed.data;
+  const { title, amount, paidBy, splitAmong, date, splitMode, percentages, shares } = parsed.data;
 
   // Verify paidBy and all splitAmong users are group members
   const groupMembers = await db.groupMember.findMany({
@@ -76,13 +125,7 @@ export async function POST(
     }
   }
 
-  // Convert amount to cents (integer) for equal split calculation
-  const amountCents = Math.round(amount * 100);
-  const participantCount = splitAmong.length;
-  const baseSplitCents = Math.floor(amountCents / participantCount);
-  const remainderCents = amountCents - baseSplitCents * participantCount;
-
-  // Sort participants alphabetically by name (then email) to determine who gets remainder
+  // Sort participants alphabetically by name (then email)
   const participantMembers = groupMembers
     .filter((m) => splitAmong.includes(m.userId))
     .sort((a, b) => {
@@ -91,14 +134,71 @@ export async function POST(
       return nameA.localeCompare(nameB);
     });
 
-  const splitData = participantMembers.map((member, index) => {
-    const extraCent = index < remainderCents ? 1 : 0;
-    const splitCents = baseSplitCents + extraCent;
-    return {
-      userId: member.userId,
-      amount: splitCents / 100,
-    };
-  });
+  const amountCents = Math.round(amount * 100);
+  let splitData: { userId: string; amount: number }[];
+
+  if (splitMode === "PERCENTAGE") {
+    // Validate percentages are provided for all participants
+    if (!percentages) {
+      return NextResponse.json(
+        { error: "Percentages are required for PERCENTAGE split mode" },
+        { status: 400 }
+      );
+    }
+
+    // Validate percentages sum to 100
+    const total = splitAmong.reduce((sum, uid) => sum + (percentages[uid] ?? 0), 0);
+    if (Math.abs(total - 100) > 0.001) {
+      return NextResponse.json(
+        { error: "Percentages must sum to 100" },
+        { status: 400 }
+      );
+    }
+
+    // Compute amounts in cents, then apply rounding rule
+    const rawCents = participantMembers.map((m) => ({
+      userId: m.userId,
+      cents: (amountCents * (percentages[m.userId] ?? 0)) / 100,
+    }));
+    splitData = applyRounding(rawCents, amountCents, paidBy, splitAmong);
+  } else if (splitMode === "SHARES") {
+    // Validate shares are provided for all participants
+    if (!shares) {
+      return NextResponse.json(
+        { error: "Shares are required for SHARES split mode" },
+        { status: 400 }
+      );
+    }
+
+    const totalWeight = splitAmong.reduce((sum, uid) => sum + (shares[uid] ?? 0), 0);
+    if (totalWeight <= 0) {
+      return NextResponse.json(
+        { error: "Total shares must be positive" },
+        { status: 400 }
+      );
+    }
+
+    // Compute amounts in cents, then apply rounding rule
+    const rawCents = participantMembers.map((m) => ({
+      userId: m.userId,
+      cents: (amountCents * (shares[m.userId] ?? 0)) / totalWeight,
+    }));
+    splitData = applyRounding(rawCents, amountCents, paidBy, splitAmong);
+  } else {
+    // EQUAL split
+    const participantCount = splitAmong.length;
+    const baseSplitCents = Math.floor(amountCents / participantCount);
+    const remainderCents = amountCents - baseSplitCents * participantCount;
+
+    splitData = participantMembers.map((member, index) => {
+      const extraCent = index < remainderCents ? 1 : 0;
+      const splitCents = baseSplitCents + extraCent;
+      return {
+        userId: member.userId,
+        amount: splitCents / 100,
+      };
+    });
+  }
 
   const expense = await db.expense.create({
     data: {
@@ -106,7 +206,7 @@ export async function POST(
       description: title,
       amount,
       currency: "USD",
-      splitMode: "EQUAL",
+      splitMode,
       date: new Date(date),
       payers: {
         create: {
