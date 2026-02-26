@@ -11,7 +11,99 @@ const createExpenseSchema = z.object({
   date: z.string().refine((v) => !isNaN(Date.parse(v)), {
     message: "Invalid date",
   }),
+  splitMode: z.enum(["EQUAL", "PERCENTAGE", "SHARES"]).optional().default("EQUAL"),
+  percentages: z.record(z.string(), z.number().min(0).max(100)).optional(),
+  shares: z.record(z.string(), z.number().int().positive()).optional(),
 });
+
+type ParticipantMember = { userId: string; user: { name: string | null; email: string } };
+
+/**
+ * Assign any remainder cents to the correct participant per spec:
+ * - If the payer is a split participant, they receive the remainder.
+ * - Otherwise, the first participant alphabetically receives the remainder.
+ */
+function assignRemainder(
+  splits: { userId: string; amountCents: number }[],
+  remainderCents: number,
+  payerId: string,
+  sortedParticipantIds: string[]
+): void {
+  if (remainderCents === 0) return;
+  const payerInSplit = sortedParticipantIds.includes(payerId);
+  const recipientId = payerInSplit ? payerId : sortedParticipantIds[0];
+  const target = splits.find((s) => s.userId === recipientId);
+  if (target) target.amountCents += remainderCents;
+}
+
+function computeEqualSplit(
+  amount: number,
+  payerId: string,
+  participants: ParticipantMember[]
+): { userId: string; amount: number }[] {
+  const amountCents = Math.round(amount * 100);
+  const count = participants.length;
+  const baseCents = Math.floor(amountCents / count);
+  const remainderCents = amountCents - baseCents * count;
+
+  const splits = participants.map((m) => ({
+    userId: m.userId,
+    amountCents: baseCents,
+  }));
+
+  assignRemainder(splits, remainderCents, payerId, participants.map((m) => m.userId));
+
+  return splits.map((s) => ({ userId: s.userId, amount: s.amountCents / 100 }));
+}
+
+function computePercentageSplit(
+  amount: number,
+  payerId: string,
+  participants: ParticipantMember[],
+  percentages: Record<string, number>
+): { userId: string; amount: number }[] {
+  const amountCents = Math.round(amount * 100);
+
+  const splits = participants.map((m) => {
+    const pct = percentages[m.userId] ?? 0;
+    return {
+      userId: m.userId,
+      amountCents: Math.floor((pct / 100) * amountCents),
+    };
+  });
+
+  const totalAssigned = splits.reduce((sum, s) => sum + s.amountCents, 0);
+  const remainderCents = amountCents - totalAssigned;
+
+  assignRemainder(splits, remainderCents, payerId, participants.map((m) => m.userId));
+
+  return splits.map((s) => ({ userId: s.userId, amount: s.amountCents / 100 }));
+}
+
+function computeSharesSplit(
+  amount: number,
+  payerId: string,
+  participants: ParticipantMember[],
+  shares: Record<string, number>
+): { userId: string; amount: number }[] {
+  const amountCents = Math.round(amount * 100);
+  const totalWeight = participants.reduce((sum, m) => sum + (shares[m.userId] ?? 0), 0);
+
+  const splits = participants.map((m) => {
+    const weight = shares[m.userId] ?? 0;
+    return {
+      userId: m.userId,
+      amountCents: Math.floor((weight / totalWeight) * amountCents),
+    };
+  });
+
+  const totalAssigned = splits.reduce((sum, s) => sum + s.amountCents, 0);
+  const remainderCents = amountCents - totalAssigned;
+
+  assignRemainder(splits, remainderCents, payerId, participants.map((m) => m.userId));
+
+  return splits.map((s) => ({ userId: s.userId, amount: s.amountCents / 100 }));
+}
 
 export async function POST(
   request: Request,
@@ -50,7 +142,7 @@ export async function POST(
     );
   }
 
-  const { title, amount, paidBy, splitAmong, date } = parsed.data;
+  const { title, amount, paidBy, splitAmong, date, splitMode, percentages, shares } = parsed.data;
 
   // Verify paidBy and all splitAmong users are group members
   const groupMembers = await db.groupMember.findMany({
@@ -76,11 +168,31 @@ export async function POST(
     }
   }
 
-  // Convert amount to cents (integer) for equal split calculation
-  const amountCents = Math.round(amount * 100);
-  const participantCount = splitAmong.length;
-  const baseSplitCents = Math.floor(amountCents / participantCount);
-  const remainderCents = amountCents - baseSplitCents * participantCount;
+  // Validate mode-specific inputs
+  if (splitMode === "PERCENTAGE") {
+    if (!percentages) {
+      return NextResponse.json(
+        { error: "Percentages are required for PERCENTAGE split mode" },
+        { status: 400 }
+      );
+    }
+    const total = splitAmong.reduce((sum, uid) => sum + (percentages[uid] ?? 0), 0);
+    if (Math.abs(total - 100) > 0.001) {
+      return NextResponse.json(
+        { error: "Percentages must sum to exactly 100%" },
+        { status: 400 }
+      );
+    }
+  }
+
+  if (splitMode === "SHARES") {
+    if (!shares) {
+      return NextResponse.json(
+        { error: "Shares are required for SHARES split mode" },
+        { status: 400 }
+      );
+    }
+  }
 
   // Sort participants alphabetically by name (then email) to determine who gets remainder
   const participantMembers = groupMembers
@@ -91,14 +203,16 @@ export async function POST(
       return nameA.localeCompare(nameB);
     });
 
-  const splitData = participantMembers.map((member, index) => {
-    const extraCent = index < remainderCents ? 1 : 0;
-    const splitCents = baseSplitCents + extraCent;
-    return {
-      userId: member.userId,
-      amount: splitCents / 100,
-    };
-  });
+  // Compute splits based on mode
+  let splitData: { userId: string; amount: number }[];
+
+  if (splitMode === "PERCENTAGE") {
+    splitData = computePercentageSplit(amount, paidBy, participantMembers, percentages!);
+  } else if (splitMode === "SHARES") {
+    splitData = computeSharesSplit(amount, paidBy, participantMembers, shares!);
+  } else {
+    splitData = computeEqualSplit(amount, paidBy, participantMembers);
+  }
 
   const expense = await db.expense.create({
     data: {
@@ -106,7 +220,7 @@ export async function POST(
       description: title,
       amount,
       currency: "USD",
-      splitMode: "EQUAL",
+      splitMode,
       date: new Date(date),
       payers: {
         create: {
