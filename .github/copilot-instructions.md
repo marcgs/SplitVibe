@@ -94,7 +94,7 @@ SplitVibe/
 
 ## Environment Variables
 
-Copy to `.env.local` for local development without Docker. Docker Compose injects these automatically.
+Copy `.env.example` to `.env` for local development without Docker. Docker Compose injects these automatically.
 
 | Variable | Description |
 |----------|-------------|
