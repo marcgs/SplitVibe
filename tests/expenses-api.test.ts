@@ -427,16 +427,26 @@ describe("POST /api/groups/[id]/expenses", () => {
     mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
 
     // $100 split by shares 1/1 between Bob and Carol only; payer is Alice (not a participant)
-    // Remainder should go to Bob (first alphabetically among participants)
+    // $100 / 3 participants (Bob, Carol, + rounding scenario) — use 3 participants to force remainder
+    // Actually use shares 1/1/1 among all 3 but payer is a non-participant "user-4"
+    const fourMembers = [
+      ...threeMembers,
+      { userId: "user-4", user: { id: "user-4", name: "Dave", email: "dave@splitvibe.dev" } },
+    ];
+    mockDb.groupMember.findMany.mockResolvedValue(fourMembers);
+
+    // $100 split by shares 1/1/1 among Alice, Bob, Carol; payer is Dave (not a participant)
+    // $100 / 3 = $33.33... each → 1 cent remainder
+    // Dave is not a participant → remainder goes to Alice (first alphabetically)
     await POST(
       jsonRequest({
         title: "Lunch",
         amount: 100,
-        paidBy: "user-1",
-        splitAmong: ["user-2", "user-3"],
+        paidBy: "user-4",
+        splitAmong: ["user-1", "user-2", "user-3"],
         date: "2025-06-15",
         splitMode: "SHARES",
-        shares: { "user-2": 1, "user-3": 1 },
+        shares: { "user-1": 1, "user-2": 1, "user-3": 1 },
       }),
       defaultParams
     );
@@ -444,12 +454,14 @@ describe("POST /api/groups/[id]/expenses", () => {
     const createCall = mockDb.expense.create.mock.calls[0][0];
     const splits = createCall.data.splits.create as { userId: string; amount: number }[];
 
+    const alice = splits.find((s) => s.userId === "user-1");
     const bob = splits.find((s) => s.userId === "user-2");
     const carol = splits.find((s) => s.userId === "user-3");
 
-    // Bob (first alphabetically, payer is not participant) gets the remainder
-    expect(bob!.amount).toBe(50);
-    expect(carol!.amount).toBe(50);
+    // Alice (first alphabetically, payer not participant) gets the remainder
+    expect(alice!.amount).toBe(33.34);
+    expect(bob!.amount).toBe(33.33);
+    expect(carol!.amount).toBe(33.33);
   });
 });
 
