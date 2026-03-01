@@ -69,31 +69,19 @@ jobs:
             core.setOutput('count', count);
             core.setOutput('max_reached', count >= max);
 
-      - name: Checkout code
+      - name: Trigger Copilot validation via comment
         if: steps.guard.outputs.max_reached == 'false'
-        uses: actions/checkout@v4
+        uses: actions/github-script@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
-      - name: Setup Node.js
-        if: steps.guard.outputs.max_reached == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Copilot CLI
-        if: steps.guard.outputs.max_reached == 'false'
-        run: npm install -g @github/copilot
-
-      - name: Run validate-pr agent
-        if: steps.guard.outputs.max_reached == 'false'
-        env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
-        run: |
-          PR_NUMBER=${{ steps.pr.outputs.number }}
-          copilot -p "Run the validate-pr agent against PR #${PR_NUMBER} in the \
-          marcgs/SplitVibe repository. Post the validation report as a comment \
-          on the PR."
+          script: |
+            const prNumber = parseInt('${{ steps.pr.outputs.number }}', 10);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: '@copilot Run the validate-pr agent against this PR.'
+            });
+            core.info(`Posted @copilot validation trigger on PR #${prNumber}`);
 
       - name: Post max-iterations notice
         if: steps.guard.outputs.max_reached == 'true'

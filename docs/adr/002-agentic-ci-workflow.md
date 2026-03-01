@@ -47,7 +47,7 @@ It runs fast, deterministic checks in order:
 
 These checks require only Node.js and a Postgres service container — no browser, no agentic compute, no secrets. They catch regressions cheaply before invoking the more expensive agentic layer.
 
-### Layer 3 — Independent Agentic Validation (Copilot CLI in Actions)
+### Layer 3 — Independent Agentic Validation (Copilot Coding Agent)
 
 A **separate** GitHub Actions workflow (`.github/workflows/validate.yml`) triggers via `workflow_run` after the CI workflow completes successfully:
 
@@ -58,22 +58,22 @@ on:
     types: [completed]
 ```
 
-The workflow installs **GitHub Copilot CLI** (`@github/copilot`) on the runner and invokes it in **programmatic mode** (`copilot -p`) to run the **validate-pr** agent directly:
+The workflow posts an `@copilot` comment on the PR to trigger the **Copilot coding agent**, which runs in a full VM with shell access and invokes the **validate-pr** agent:
 
-```bash
-copilot -p "Run the validate-pr agent against PR #$PR_NUMBER in the
-marcgs/SplitVibe repository. Post the validation report as a comment
-on the PR."
+```
+@copilot Run the validate-pr agent against this PR.
 ```
 
-This uses the [Copilot CLI Actions integration](https://docs.github.com/en/copilot/how-tos/copilot-cli/automate-with-actions) — the CLI runs on the Actions runner, authenticated via a fine-grained PAT stored as `COPILOT_PAT` repository secret (requires the **Copilot Requests** permission).
+The coding agent picks up the mention, spins up a sandboxed environment, and executes the validate-pr agent with full access to Docker, git, npm, and Playwright MCP browser tools.
+
+> **Why not Copilot CLI?** The CLI's programmatic mode (`copilot -p`) runs with a restricted shell sandbox — most commands (git, docker, npm, curl, bash) are denied. The validate-pr agent requires full shell access to set up infrastructure and run E2E tests. The coding agent provides this.
 
 Key behaviors:
 
-- **Gate on CI**: The validation workflow uses `workflow_run` to trigger only after the CI workflow completes successfully. Copilot CLI is never invoked if `tsc`, lint, or tests fail.
-- **Separate workflows**: CI (`.github/workflows/ci.yml`) and validation (`.github/workflows/validate.yml`) are independent workflows with separate permissions, concurrency groups, and secrets scoping. CI needs no secrets; only the validation workflow accesses `COPILOT_PAT`.
-- **Loop guard**: Before invoking the CLI, the job counts existing "Validation Report" comments on the PR. If the count reaches a configurable maximum (default: 3), it posts a "manual review needed" comment instead, preventing infinite loops.
-- **Direct invocation**: Unlike a `@copilot` comment trigger, the CLI call is deterministic — it runs immediately as part of the workflow, with no dependency on Copilot monitoring PR comments.
+- **Gate on CI**: The validation workflow uses `workflow_run` to trigger only after the CI workflow completes successfully. The coding agent is never invoked if `tsc`, lint, or tests fail.
+- **Separate workflows**: CI (`.github/workflows/ci.yml`) and validation (`.github/workflows/validate.yml`) are independent workflows with separate concurrency groups. CI needs no secrets; the validation workflow uses only the default `GITHUB_TOKEN` to post the trigger comment.
+- **Loop guard**: Before posting the trigger comment, the job counts existing "Validation Report" comments on the PR. If the count reaches a configurable maximum (default: 3), it posts a "manual review needed" comment instead, preventing infinite loops.
+- **No PAT required**: The `@copilot` mention is posted using the built-in `GITHUB_TOKEN`, eliminating the need for a separate `COPILOT_PAT` secret.
 - **Idempotency**: The validate-pr agent updates an existing validation comment rather than creating duplicates (already defined in the agent's step 8).
 
 ### Feedback Loop
@@ -115,7 +115,8 @@ The loop terminates when:
     Status     ┌──────────────────────┐
     check      │  validate.yml         │
     fails PR   │  (Layer 3)            │
-               │  copilot -p           │
+               │  posts @copilot       │
+               │  → coding agent       │
                │  → validate-pr agent  │
                └────────┬─────────────┘
                         │
@@ -146,17 +147,18 @@ The loop terminates when:
 - This is simpler to set up but means both jobs share the same permissions scope and secrets access. CI doesn't need `COPILOT_PAT`, so exposing it to the entire workflow violates least-privilege. It also prevents re-running validation independently without re-running CI.
 - Rejected in favor of separate workflows connected via `workflow_run`, which provides independent permissions, concurrency groups, and re-run isolation.
 
-### Trigger via PR comment (`@copilot` mention)
+### Direct Copilot CLI invocation (`copilot -p`)
 
-- Instead of invoking Copilot CLI directly, the workflow could post a `@copilot` comment on the PR to trigger the coding agent.
-- This avoids the PAT requirement (uses the built-in `GITHUB_TOKEN` to post a comment) but introduces non-determinism — the trigger depends on Copilot monitoring PR comments, which adds latency and may not always invoke the correct agent.
-- Rejected in favor of direct CLI invocation, which is immediate, deterministic, and provides structured exit codes for workflow control.
+- The workflow would install Copilot CLI on the Actions runner and invoke it in programmatic mode (`copilot -p`) to run the validate-pr agent directly, authenticated via a fine-grained PAT.
+- This was the original design: deterministic, immediate, with structured exit codes for workflow control.
+- **Rejected after testing:** Copilot CLI's programmatic mode runs with a restricted shell sandbox — most commands (git, docker, npm, curl, bash) fail with "Permission denied". The validate-pr agent requires full shell access to set up infrastructure (Docker services, dev server) and run E2E tests (Playwright). The CLI can only perform read-only file operations and GitHub MCP API calls, which is insufficient for acceptance criteria validation.
+- The `@copilot` comment trigger was adopted instead, trading deterministic timing for full shell access in the coding agent's VM.
 
 ### Run validate-pr entirely inside GitHub Actions runner
 
 - The validate-pr agent requires Docker services (Postgres, Azurite), a running Next.js dev server, and Playwright MCP browser tools.
 - Running all of this as a traditional GitHub Actions job (without Copilot) is possible but complex — it requires self-hosted runners with browser support, duplicates test logic already encoded in the agent, and does not benefit from AI-powered exploratory validation.
-- Rejected because Copilot CLI on the runner gets the best of both worlds: the runner provides compute and the CLI provides agentic reasoning.
+- Rejected because the Copilot coding agent provides a full VM with Docker support and AI-powered reasoning, making it a better fit.
 
 ### Run validate-pr in parallel with CI (not gated)
 
@@ -184,8 +186,8 @@ The loop terminates when:
 - **Independent verification** — the validate-pr agent checks acceptance criteria separately from the implementor, catching systematic misinterpretations.
 - **Fast feedback** — deterministic CI catches type errors, lint issues, and test failures in minutes, before expensive agentic validation runs.
 - **Automated iteration** — the Copilot feedback loop (fail → fix → re-validate) reduces human toil for routine fixes.
-- **Deterministic trigger** — Copilot CLI invocation is immediate and reliable, unlike comment-based triggers that depend on event polling.
-- **Minimal permissions** — the CI workflow needs no secrets or special tokens; the `COPILOT_PAT` is isolated to the validation workflow.
+- **No secrets required** — the validation workflow uses only the built-in `GITHUB_TOKEN` to post the `@copilot` trigger comment. No PAT management or rotation needed.
+- **Full shell access** — the Copilot coding agent runs in a complete VM with Docker, git, npm, and browser support, enabling E2E validation with Playwright.
 - **Independent re-runs** — separate workflows allow re-running validation without re-running CI, and vice versa.
 - **Visible audit trail** — validation reports are posted as PR comments, giving reviewers full visibility into what was checked and how.
 - **Cost efficient** — agentic validation only runs after cheap deterministic checks pass.
@@ -193,11 +195,11 @@ The loop terminates when:
 ### Negative
 
 - **Latency** — the sequential pipeline (CI → agentic validation) adds wall-clock time compared to parallel execution. Acceptable given the cost savings.
-- **PAT requirement** — Copilot CLI authentication requires a fine-grained personal access token stored as a repository secret (`COPILOT_PAT`). This token must be maintained and rotated.
-- **Copilot dependency** — Layer 3 relies on Copilot CLI being available and functional on the Actions runner. If authentication fails or the CLI is unavailable, validation is skipped (CI still runs independently).
+- **Non-deterministic timing** — the `@copilot` comment trigger depends on Copilot monitoring PR comments, which introduces variable latency (typically seconds to minutes). Unlike a direct CLI call, there's no guaranteed SLA on when the agent starts.
+- **Copilot dependency** — Layer 3 relies on the Copilot coding agent being enabled and responsive. If Copilot doesn't pick up the mention, validation is silently skipped (CI still runs independently).
 
 ### Risks
 
 - **Infinite loop** — if validation keeps failing and Copilot keeps pushing broken fixes, the loop could run indefinitely. Mitigated by the configurable iteration cap (default: 3).
 - **Cost at scale** — each agentic validation run consumes Copilot compute. For high-volume PRs, costs could grow. Mitigated by gating on CI and the iteration cap.
-- **Token expiry** — the PAT used for Copilot CLI authentication may expire. Mitigated by monitoring workflow failures and using long-lived tokens with minimal scopes.
+- **Missed trigger** — if Copilot doesn't process the `@copilot` comment (e.g., rate limits, outages), the PR won't get validated. Mitigated by the visible comment trail — reviewers can manually trigger validation by posting another `@copilot` comment.
