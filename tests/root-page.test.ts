@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
 describe("Root page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
   it("should redirect authenticated users to /dashboard", async () => {
