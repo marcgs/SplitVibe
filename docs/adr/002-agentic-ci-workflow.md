@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-03-01
+**Validated:** CI workflow verified (pass + fail paths); validate workflow pending first `workflow_run` trigger.
 
 ---
 
