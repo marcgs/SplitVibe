@@ -45,32 +45,44 @@ It runs fast, deterministic checks in order:
 3. **test** — `npm test` (Vitest unit/integration)
 4. **build** — `npm run build` (production build smoke-check)
 
-These checks require only Node.js and a Postgres service container — no browser, no agentic compute. They catch regressions cheaply before invoking the more expensive agentic layer.
+These checks require only Node.js and a Postgres service container — no browser, no agentic compute, no secrets. They catch regressions cheaply before invoking the more expensive agentic layer.
 
-### Layer 3 — Independent Agentic Validation (Copilot via PR comment)
+### Layer 3 — Independent Agentic Validation (Copilot CLI in Actions)
 
-After deterministic CI passes, the workflow posts a PR comment that triggers the Copilot coding agent to run the **validate-pr** agent independently:
+A **separate** GitHub Actions workflow (`.github/workflows/validate.yml`) triggers via `workflow_run` after the CI workflow completes successfully:
 
+```yaml
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 ```
-@copilot Please validate this PR's acceptance criteria against the linked
-issue using the validate-pr agent. Post the validation report as a comment
-on this PR.
+
+The workflow installs **GitHub Copilot CLI** (`@github/copilot`) on the runner and invokes it in **programmatic mode** (`copilot -p`) to run the **validate-pr** agent directly:
+
+```bash
+copilot -p "Run the validate-pr agent against PR #$PR_NUMBER in the
+marcgs/SplitVibe repository. Post the validation report as a comment
+on the PR."
 ```
+
+This uses the [Copilot CLI Actions integration](https://docs.github.com/en/copilot/how-tos/copilot-cli/automate-with-actions) — the CLI runs on the Actions runner, authenticated via a fine-grained PAT stored as `COPILOT_PAT` repository secret (requires the **Copilot Requests** permission).
 
 Key behaviors:
 
-- **Gate on CI**: The agentic validation comment is only posted if all Layer 2 checks pass. There is no point burning agentic compute if `tsc` or tests fail.
-- **Loop guard**: Before posting, the workflow counts existing `@copilot` validation trigger comments. If the count exceeds a configurable maximum (default: 3), it posts a summary comment instead of triggering another iteration, preventing infinite loops.
+- **Gate on CI**: The validation workflow uses `workflow_run` to trigger only after the CI workflow completes successfully. Copilot CLI is never invoked if `tsc`, lint, or tests fail.
+- **Separate workflows**: CI (`.github/workflows/ci.yml`) and validation (`.github/workflows/validate.yml`) are independent workflows with separate permissions, concurrency groups, and secrets scoping. CI needs no secrets; only the validation workflow accesses `COPILOT_PAT`.
+- **Loop guard**: Before invoking the CLI, the job counts existing "Validation Report" comments on the PR. If the count reaches a configurable maximum (default: 3), it posts a "manual review needed" comment instead, preventing infinite loops.
+- **Direct invocation**: Unlike a `@copilot` comment trigger, the CLI call is deterministic — it runs immediately as part of the workflow, with no dependency on Copilot monitoring PR comments.
 - **Idempotency**: The validate-pr agent updates an existing validation comment rather than creating duplicates (already defined in the agent's step 8).
 
 ### Feedback Loop
 
 When the validate-pr agent finds failures:
 
-1. It posts a validation report on the PR with specific failure details.
-2. The report includes an `@copilot` mention requesting fixes for the failing criteria.
-3. Copilot coding agent picks up the comment, fixes the code, and pushes new commits.
-4. New commits trigger the CI workflow again (Layer 2 → Layer 3), closing the loop.
+1. It posts a validation report on the PR with specific failure details and an `@copilot` mention requesting fixes.
+2. The Copilot coding agent picks up the mention, fixes the code, and pushes new commits.
+3. The new commits trigger the CI workflow again (Layer 2), and on success the validation workflow re-triggers (Layer 3), closing the loop.
 
 The loop terminates when:
 
@@ -91,7 +103,7 @@ The loop terminates when:
              │ Opens PR
              ▼
   ┌─────────────────────────────────┐
-  │  Layer 2: GitHub Actions CI      │
+  │  ci.yml (Layer 2)               │
   │  typecheck → lint → test → build │
   └──────────┬──────────────────────┘
              │
@@ -99,43 +111,52 @@ The loop terminates when:
         │         │
      ❌ Fail    ✅ Pass
         │         │
-        ▼         ▼
-   Copilot     Post @copilot
-   fixes       validate-pr trigger
-   (via CI             │
-   failure             ▼
-   feedback)  ┌──────────────────┐
-              │  Layer 3:         │
-              │  validate-pr      │
-              │  (independent)    │
-              └────────┬─────────┘
-                       │
-                  ┌────┴────┐
-                  │         │
-               ❌ Fail    ✅ Pass
-                  │         │
-                  ▼         ▼
-             @copilot    Ready for
-             fix request  human review
-                  │
-                  ▼
-             Copilot pushes
-             new commits
-                  │
-                  ▼
-             CI re-triggers
-             (back to Layer 2)
+        ▼         ▼ workflow_run
+    Status     ┌──────────────────────┐
+    check      │  validate.yml         │
+    fails PR   │  (Layer 3)            │
+               │  copilot -p           │
+               │  → validate-pr agent  │
+               └────────┬─────────────┘
+                        │
+                   ┌────┴────┐
+                   │         │
+                ❌ Fail    ✅ Pass
+                   │         │
+                   ▼         ▼
+              @copilot     Ready for
+              fix request  human review
+                   │
+                   ▼
+              Copilot pushes
+              new commits
+                   │
+                   ▼
+              CI re-triggers
+              (back to ci.yml)
 ```
 
 ---
 
 ## Alternatives Considered
 
-### Run validate-pr inside GitHub Actions runner
+### Single workflow with CI and validation as jobs
+
+- Both deterministic CI and agentic validation could live in the same workflow file, with `needs:` linking the validation job to the CI job.
+- This is simpler to set up but means both jobs share the same permissions scope and secrets access. CI doesn't need `COPILOT_PAT`, so exposing it to the entire workflow violates least-privilege. It also prevents re-running validation independently without re-running CI.
+- Rejected in favor of separate workflows connected via `workflow_run`, which provides independent permissions, concurrency groups, and re-run isolation.
+
+### Trigger via PR comment (`@copilot` mention)
+
+- Instead of invoking Copilot CLI directly, the workflow could post a `@copilot` comment on the PR to trigger the coding agent.
+- This avoids the PAT requirement (uses the built-in `GITHUB_TOKEN` to post a comment) but introduces non-determinism — the trigger depends on Copilot monitoring PR comments, which adds latency and may not always invoke the correct agent.
+- Rejected in favor of direct CLI invocation, which is immediate, deterministic, and provides structured exit codes for workflow control.
+
+### Run validate-pr entirely inside GitHub Actions runner
 
 - The validate-pr agent requires Docker services (Postgres, Azurite), a running Next.js dev server, and Playwright MCP browser tools.
-- Running all of this inside a GitHub Actions runner is possible but expensive, complex (self-hosted runner with browser support), and duplicates infrastructure that Copilot's own agent runtime already provides.
-- Rejected in favor of triggering Copilot via PR comments, which leverages its native environment.
+- Running all of this as a traditional GitHub Actions job (without Copilot) is possible but complex — it requires self-hosted runners with browser support, duplicates test logic already encoded in the agent, and does not benefit from AI-powered exploratory validation.
+- Rejected because Copilot CLI on the runner gets the best of both worlds: the runner provides compute and the CLI provides agentic reasoning.
 
 ### Run validate-pr in parallel with CI (not gated)
 
@@ -163,17 +184,20 @@ The loop terminates when:
 - **Independent verification** — the validate-pr agent checks acceptance criteria separately from the implementor, catching systematic misinterpretations.
 - **Fast feedback** — deterministic CI catches type errors, lint issues, and test failures in minutes, before expensive agentic validation runs.
 - **Automated iteration** — the Copilot feedback loop (fail → fix → re-validate) reduces human toil for routine fixes.
+- **Deterministic trigger** — Copilot CLI invocation is immediate and reliable, unlike comment-based triggers that depend on event polling.
+- **Minimal permissions** — the CI workflow needs no secrets or special tokens; the `COPILOT_PAT` is isolated to the validation workflow.
+- **Independent re-runs** — separate workflows allow re-running validation without re-running CI, and vice versa.
 - **Visible audit trail** — validation reports are posted as PR comments, giving reviewers full visibility into what was checked and how.
 - **Cost efficient** — agentic validation only runs after cheap deterministic checks pass.
 
 ### Negative
 
 - **Latency** — the sequential pipeline (CI → agentic validation) adds wall-clock time compared to parallel execution. Acceptable given the cost savings.
-- **Comment noise** — multiple validation iterations generate several PR comments. Mitigated by the validate-pr agent updating existing comments rather than creating new ones.
-- **Copilot dependency** — Layer 3 relies on Copilot coding agent being available and responsive. If Copilot is down, validation is skipped (CI still runs independently).
+- **PAT requirement** — Copilot CLI authentication requires a fine-grained personal access token stored as a repository secret (`COPILOT_PAT`). This token must be maintained and rotated.
+- **Copilot dependency** — Layer 3 relies on Copilot CLI being available and functional on the Actions runner. If authentication fails or the CLI is unavailable, validation is skipped (CI still runs independently).
 
 ### Risks
 
 - **Infinite loop** — if validation keeps failing and Copilot keeps pushing broken fixes, the loop could run indefinitely. Mitigated by the configurable iteration cap (default: 3).
-- **Comment trigger reliability** — Copilot's response to `@copilot` mentions in PR comments may not always invoke the validate-pr agent correctly. May need prompt tuning over time.
-- **Cost at scale** — each agentic validation run involves spinning up Docker services, running a dev server, and browser-based testing. For high-volume PRs, costs could grow. Mitigated by gating on CI and the iteration cap.
+- **Cost at scale** — each agentic validation run consumes Copilot compute. For high-volume PRs, costs could grow. Mitigated by gating on CI and the iteration cap.
+- **Token expiry** — the PAT used for Copilot CLI authentication may expire. Mitigated by monitoring workflow failures and using long-lived tokens with minimal scopes.
