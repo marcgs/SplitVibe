@@ -71,9 +71,9 @@ The coding agent picks up the mention, spins up a sandboxed environment, and exe
 Key behaviors:
 
 - **Gate on CI**: The validation workflow uses `workflow_run` to trigger only after the CI workflow completes successfully. The coding agent is never invoked if `tsc`, lint, or tests fail.
-- **Separate workflows**: CI (`.github/workflows/ci.yml`) and validation (`.github/workflows/validate.yml`) are independent workflows with separate concurrency groups. CI needs no secrets; the validation workflow uses only the default `GITHUB_TOKEN` to post the trigger comment.
+- **Separate workflows**: CI (`.github/workflows/ci.yml`) and validation (`.github/workflows/validate.yml`) are independent workflows with separate concurrency groups. CI needs no secrets; the validation workflow needs only `COPILOT_PAT` to post the trigger comment.
 - **Loop guard**: Before posting the trigger comment, the job counts existing "Validation Report" comments on the PR. If the count reaches a configurable maximum (default: 3), it posts a "manual review needed" comment instead, preventing infinite loops.
-- **No PAT required**: The `@copilot` mention is posted using the built-in `GITHUB_TOKEN`, eliminating the need for a separate `COPILOT_PAT` secret.
+- **PAT for trigger comment**: The `@copilot` mention must be posted using a real-user PAT (`COPILOT_PAT` repository secret) — the Copilot coding agent ignores bot-authored mentions (e.g., from `github-actions[bot]` via `GITHUB_TOKEN`) to prevent infinite loops. The PAT needs `Pull requests: Read & write` and `Contents: Read` repository permissions.
 - **Idempotency**: The validate-pr agent updates an existing validation comment rather than creating duplicates (already defined in the agent's step 8).
 
 ### Feedback Loop
@@ -186,7 +186,7 @@ The loop terminates when:
 - **Independent verification** — the validate-pr agent checks acceptance criteria separately from the implementor, catching systematic misinterpretations.
 - **Fast feedback** — deterministic CI catches type errors, lint issues, and test failures in minutes, before expensive agentic validation runs.
 - **Automated iteration** — the Copilot feedback loop (fail → fix → re-validate) reduces human toil for routine fixes.
-- **No secrets required** — the validation workflow uses only the built-in `GITHUB_TOKEN` to post the `@copilot` trigger comment. No PAT management or rotation needed.
+- **Minimal secrets** — the validation workflow requires a single `COPILOT_PAT` repository secret (fine-grained PAT with PR write access) to post the `@copilot` trigger comment as a real user. The Copilot coding agent ignores bot-authored mentions, so the built-in `GITHUB_TOKEN` cannot be used for this step.
 - **Full shell access** — the Copilot coding agent runs in a complete VM with Docker, git, npm, and browser support, enabling E2E validation with Playwright.
 - **Independent re-runs** — separate workflows allow re-running validation without re-running CI, and vice versa.
 - **Visible audit trail** — validation reports are posted as PR comments, giving reviewers full visibility into what was checked and how.
@@ -203,3 +203,4 @@ The loop terminates when:
 - **Infinite loop** — if validation keeps failing and Copilot keeps pushing broken fixes, the loop could run indefinitely. Mitigated by the configurable iteration cap (default: 3).
 - **Cost at scale** — each agentic validation run consumes Copilot compute. For high-volume PRs, costs could grow. Mitigated by gating on CI and the iteration cap.
 - **Missed trigger** — if Copilot doesn't process the `@copilot` comment (e.g., rate limits, outages), the PR won't get validated. Mitigated by the visible comment trail — reviewers can manually trigger validation by posting another `@copilot` comment.
+- **PAT rotation** — the `COPILOT_PAT` secret must be rotated before it expires. Fine-grained PATs have a configurable expiry (max 1 year). Mitigated by GitHub's built-in expiry notifications.
