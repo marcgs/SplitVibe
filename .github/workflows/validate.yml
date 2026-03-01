@@ -82,7 +82,14 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
-              body: '@copilot Run the validate-pr agent against this PR.'
+              body: [
+                '@copilot Use the **validate-pr** skill on this PR.',
+                '',
+                'Instructions:',
+                '- Invoke the `validate-pr` skill (defined in `.github/agents/validate-pr.agent.md`).',
+                '- The skill will validate acceptance criteria and post a **Validation Report** comment on this PR.',
+                '- **Do NOT create a new branch or open a new pull request.** Only post the validation report as a comment here.',
+              ].join('\n')
             });
             core.info(`Posted @copilot validation trigger on PR #${prNumber}`);
 
