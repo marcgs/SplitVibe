@@ -47,6 +47,12 @@ param storageConnectionStringSecretUri string
 @description('Public app URL')
 param appUrl string
 
+@description('User-assigned managed identity resource ID')
+param managedIdentityId string
+
+@description('User-assigned managed identity client ID')
+param managedIdentityClientId string
+
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: last(split(logAnalyticsWorkspaceId, '/'))!
 }
@@ -79,7 +85,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentityId}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
@@ -93,34 +102,34 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: acrLoginServer
-          identity: 'system'
+          identity: managedIdentityId
         }
       ]
       secrets: [
         {
           name: 'database-url'
           keyVaultUrl: databaseUrlSecretUri
-          identity: 'system'
+          identity: managedIdentityId
         }
         {
           name: 'nextauth-secret'
           keyVaultUrl: nextAuthSecretSecretUri
-          identity: 'system'
+          identity: managedIdentityId
         }
         {
           name: 'azure-storage-account-name'
           keyVaultUrl: storageAccountNameSecretUri
-          identity: 'system'
+          identity: managedIdentityId
         }
         {
           name: 'azure-storage-account-key'
           keyVaultUrl: storageAccountKeySecretUri
-          identity: 'system'
+          identity: managedIdentityId
         }
         {
           name: 'azure-storage-connection-string'
           keyVaultUrl: storageConnectionStringSecretUri
-          identity: 'system'
+          identity: managedIdentityId
         }
       ]
     }
@@ -190,9 +199,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     }
   }
 }
-
-@description('Container App principal ID (managed identity)')
-output principalId string = containerApp.identity.principalId
 
 @description('Container App FQDN')
 output fqdn string = containerApp.properties.configuration.ingress.fqdn

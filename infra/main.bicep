@@ -50,12 +50,26 @@ var containerAppsEnvName = 'cae-${baseName}-${environment}'
 var containerAppName = 'ca-${baseName}-${environment}'
 var logAnalyticsName = 'log-${baseName}-${environment}'
 var vnetName = 'vnet-${baseName}-${environment}'
+var managedIdentityName = 'id-${baseName}-${environment}'
 
 // ── Resource Group ──────────────────────────────────────────────────────────
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
+}
+
+// ── Managed Identity ────────────────────────────────────────────────────────
+// Deployed first so role assignments can reference its principalId before
+// the Container App is created (avoids RBAC chicken-and-egg on first deploy).
+
+module managedIdentity 'modules/managedIdentity.bicep' = {
+  name: 'managedIdentity'
+  scope: rg
+  params: {
+    location: location
+    identityName: managedIdentityName
+  }
 }
 
 // ── Networking ──────────────────────────────────────────────────────────────
@@ -141,12 +155,50 @@ module keyVault 'modules/keyVault.bicep' = {
   }
 }
 
+// ── Role Assignments ────────────────────────────────────────────────────────
+// Deployed BEFORE the Container App so RBAC is in place when the app starts.
+// Uses the user-assigned managed identity so principalId is known ahead of time.
+
+// AcrPull — allow the Container App to pull images from ACR
+module acrPullRole 'modules/roleAssignment.bicep' = {
+  name: 'acrPullRole'
+  scope: rg
+  params: {
+    principalId: managedIdentity.outputs.principalId
+    roleDefinitionId: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+    targetResourceId: acr.outputs.id
+  }
+}
+
+// Storage Blob Data Contributor — allow the Container App to read/write blobs
+module storageBlobRole 'modules/roleAssignment.bicep' = {
+  name: 'storageBlobRole'
+  scope: rg
+  params: {
+    principalId: managedIdentity.outputs.principalId
+    roleDefinitionId: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+    targetResourceId: storage.outputs.id
+  }
+}
+
+// Key Vault Secrets User — allow the Container App to read secrets
+module keyVaultSecretsRole 'modules/roleAssignment.bicep' = {
+  name: 'keyVaultSecretsRole'
+  scope: rg
+  params: {
+    principalId: managedIdentity.outputs.principalId
+    roleDefinitionId: '4633458b-17de-408a-b874-0445c86b69e6'
+    targetResourceId: keyVault.outputs.id
+  }
+}
+
 // ── Container Apps ──────────────────────────────────────────────────────────
-// Deployed after Key Vault so it can reference secret URIs.
+// Deployed after Key Vault (secret URIs) and after role assignments (RBAC ready).
 
 module containerApps 'modules/containerApps.bicep' = {
   name: 'containerApps'
   scope: rg
+  dependsOn: [acrPullRole, storageBlobRole, keyVaultSecretsRole]
   params: {
     location: location
     environment: environment
@@ -162,42 +214,8 @@ module containerApps 'modules/containerApps.bicep' = {
     storageAccountKeySecretUri: keyVault.outputs.storageAccountKeySecretUri
     storageConnectionStringSecretUri: keyVault.outputs.storageConnectionStringSecretUri
     appUrl: appUrl
-  }
-}
-
-// ── Role Assignments ────────────────────────────────────────────────────────
-// Deployed after Container App so we can reference its system-assigned identity.
-
-// AcrPull — allow the Container App to pull images from ACR
-module acrPullRole 'modules/roleAssignment.bicep' = {
-  name: 'acrPullRole'
-  scope: rg
-  params: {
-    principalId: containerApps.outputs.principalId
-    roleDefinitionId: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-    targetResourceId: acr.outputs.id
-  }
-}
-
-// Storage Blob Data Contributor — allow the Container App to read/write blobs
-module storageBlobRole 'modules/roleAssignment.bicep' = {
-  name: 'storageBlobRole'
-  scope: rg
-  params: {
-    principalId: containerApps.outputs.principalId
-    roleDefinitionId: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-    targetResourceId: storage.outputs.id
-  }
-}
-
-// Key Vault Secrets User — allow the Container App to read secrets
-module keyVaultSecretsRole 'modules/roleAssignment.bicep' = {
-  name: 'keyVaultSecretsRole'
-  scope: rg
-  params: {
-    principalId: containerApps.outputs.principalId
-    roleDefinitionId: '4633458b-17de-408a-b874-0445c86b69e6'
-    targetResourceId: keyVault.outputs.id
+    managedIdentityId: managedIdentity.outputs.id
+    managedIdentityClientId: managedIdentity.outputs.clientId
   }
 }
 
