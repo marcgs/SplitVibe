@@ -38,6 +38,9 @@ param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Public application URL for Auth.js (update after initial deployment with actual FQDN)')
 param appUrl string = ''
 
+@description('Container port (default 3000 for SplitVibe; use 80 for placeholder quickstart image)')
+param targetPort int = 3000
+
 // ── Derived names ───────────────────────────────────────────────────────────
 
 var suffix = uniqueString(subscription().subscriptionId, environment, baseName)
@@ -215,7 +218,7 @@ module containerApps 'modules/containerApps.bicep' = {
     storageConnectionStringSecretUri: keyVault.outputs.storageConnectionStringSecretUri
     appUrl: appUrl
     managedIdentityId: managedIdentity.outputs.id
-    managedIdentityClientId: managedIdentity.outputs.clientId
+    targetPort: targetPort
   }
 }
 

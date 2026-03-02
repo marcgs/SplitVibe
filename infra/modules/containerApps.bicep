@@ -50,8 +50,8 @@ param appUrl string
 @description('User-assigned managed identity resource ID')
 param managedIdentityId string
 
-@description('User-assigned managed identity client ID')
-param managedIdentityClientId string
+@description('Container port to route ingress traffic to')
+param targetPort int = 3000
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: last(split(logAnalyticsWorkspaceId, '/'))!
@@ -95,7 +95,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       ingress: {
         external: true
-        targetPort: 3000
+        targetPort: targetPort
         transport: 'http'
         allowInsecure: false
       }
