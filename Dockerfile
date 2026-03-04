@@ -52,15 +52,15 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma CLI and its dependencies for running migrations at container startup.
-# prisma.config.ts provides the DATABASE_URL (via env var in production).
-# @prisma/engines contains the schema-engine binary needed by migrate deploy.
+# Copy Prisma schema and config for running migrations at container startup.
 # dotenv is copied so prisma.config.ts can import it (no-op when .env not present).
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
+
+# Install Prisma CLI globally so all its dependencies are resolved by npm,
+# avoiding the need to copy the entire node_modules tree into the runner.
+RUN npm install -g prisma@7.4.1
 
 COPY start.sh ./
 RUN chmod +x start.sh
