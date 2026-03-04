@@ -44,6 +44,12 @@ param storageAccountKeySecretUri string
 @description('AZURE_STORAGE_CONNECTION_STRING Key Vault secret URI')
 param storageConnectionStringSecretUri string
 
+@description('AUTH_GOOGLE_ID Key Vault secret URI')
+param authGoogleIdSecretUri string
+
+@description('AUTH_GOOGLE_SECRET Key Vault secret URI')
+param authGoogleSecretSecretUri string
+
 @description('Public app URL')
 param appUrl string
 
@@ -131,6 +137,16 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: storageConnectionStringSecretUri
           identity: managedIdentityId
         }
+        {
+          name: 'auth-google-id'
+          keyVaultUrl: authGoogleIdSecretUri
+          identity: managedIdentityId
+        }
+        {
+          name: 'auth-google-secret'
+          keyVaultUrl: authGoogleSecretSecretUri
+          identity: managedIdentityId
+        }
       ]
     }
     template: {
@@ -170,6 +186,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'AZURE_STORAGE_CONTAINER_NAME'
               value: 'attachments'
+            }
+            {
+              name: 'AUTH_GOOGLE_ID'
+              secretRef: 'auth-google-id'
+            }
+            {
+              name: 'AUTH_GOOGLE_SECRET'
+              secretRef: 'auth-google-secret'
             }
             {
               name: 'NODE_ENV'

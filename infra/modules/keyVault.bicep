@@ -27,6 +27,13 @@ param nextAuthSecret string
 @description('Name of the existing storage account to reference')
 param storageAccountName string
 
+@description('Google OAuth client ID')
+param authGoogleId string
+
+@secure()
+@description('Google OAuth client secret')
+param authGoogleSecret string
+
 // Reference the existing storage account to retrieve keys without exposing them
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
@@ -91,6 +98,22 @@ resource secretStorageConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-0
   }
 }
 
+resource secretAuthGoogleId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'AUTH-GOOGLE-ID'
+  properties: {
+    value: authGoogleId
+  }
+}
+
+resource secretAuthGoogleSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'AUTH-GOOGLE-SECRET'
+  properties: {
+    value: authGoogleSecret
+  }
+}
+
 @description('Key Vault resource ID')
 output id string = keyVault.id
 
@@ -114,3 +137,9 @@ output storageAccountKeySecretUri string = secretStorageAccountKey.properties.se
 
 @description('AZURE_STORAGE_CONNECTION_STRING secret URI')
 output storageConnectionStringSecretUri string = secretStorageConnectionString.properties.secretUri
+
+@description('AUTH_GOOGLE_ID secret URI')
+output authGoogleIdSecretUri string = secretAuthGoogleId.properties.secretUri
+
+@description('AUTH_GOOGLE_SECRET secret URI')
+output authGoogleSecretSecretUri string = secretAuthGoogleSecret.properties.secretUri

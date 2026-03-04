@@ -41,6 +41,13 @@ param appUrl string = ''
 @description('Container port (default 3000 for SplitVibe; use 80 for placeholder quickstart image)')
 param targetPort int = 3000
 
+@description('Google OAuth client ID')
+param authGoogleId string
+
+@secure()
+@description('Google OAuth client secret')
+param authGoogleSecret string
+
 // ── Derived names ───────────────────────────────────────────────────────────
 
 var suffix = uniqueString(subscription().subscriptionId, environment, baseName)
@@ -155,6 +162,8 @@ module keyVault 'modules/keyVault.bicep' = {
     postgresDatabaseName: postgres.outputs.databaseName
     nextAuthSecret: nextAuthSecret
     storageAccountName: storage.outputs.name
+    authGoogleId: authGoogleId
+    authGoogleSecret: authGoogleSecret
   }
 }
 
@@ -216,6 +225,8 @@ module containerApps 'modules/containerApps.bicep' = {
     storageAccountNameSecretUri: keyVault.outputs.storageAccountNameSecretUri
     storageAccountKeySecretUri: keyVault.outputs.storageAccountKeySecretUri
     storageConnectionStringSecretUri: keyVault.outputs.storageConnectionStringSecretUri
+    authGoogleIdSecretUri: keyVault.outputs.authGoogleIdSecretUri
+    authGoogleSecretSecretUri: keyVault.outputs.authGoogleSecretSecretUri
     appUrl: appUrl
     managedIdentityId: managedIdentity.outputs.id
     targetPort: targetPort
