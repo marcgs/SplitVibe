@@ -59,3 +59,6 @@ RUN npx prisma generate
 EXPOSE 3000
 
 CMD ["npm", "run", "dev"]
+
+# Default final stage for plain `docker build` should be the production runtime.
+FROM runner AS production

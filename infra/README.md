@@ -42,11 +42,14 @@ infra/
 
    The dev environment deploys with the Azure Container Apps placeholder image
    (`mcr.microsoft.com/k8se/quickstart:latest`) listening on port 80.
-   Google OAuth parameters are optional for initial bootstrap.
+   Google OAuth parameters are optional for initial bootstrap. The checked-in
+   parameter files default to `northeurope`, which has been reliable for Azure
+   Container Apps capacity during validation; if you switch regions, keep the
+   deployment location and the `location` parameter aligned.
 
    ```bash
    az deployment sub create \
-     --location westeurope \
+     --location northeurope \
      --template-file infra/main.bicep \
      --parameters infra/parameters/dev.parameters.json \
      --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
@@ -66,7 +69,7 @@ infra/
 
    ```bash
    az deployment sub create \
-     --location westeurope \
+     --location northeurope \
      --template-file infra/main.bicep \
      --parameters infra/parameters/prod.parameters.json \
      --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
@@ -141,7 +144,7 @@ In your GitHub Actions `deploy.yml` workflow, use the Azure CLI to deploy:
   with:
     inlineScript: |
       az deployment sub create \
-        --location westeurope \
+        --location northeurope \
         --template-file infra/main.bicep \
         --parameters infra/parameters/prod.parameters.json \
         --parameters postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
