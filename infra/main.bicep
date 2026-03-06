@@ -4,7 +4,7 @@
 //   az deployment sub create \
 //     --location <region> \
 //     --template-file infra/main.bicep \
-//     --parameters infra/parameters/dev.bicepparam
+//     --parameters infra/parameters/dev.parameters.json
 // ---------------------------------------------------------------------------
 
 targetScope = 'subscription'

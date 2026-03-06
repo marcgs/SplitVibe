@@ -43,5 +43,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Bicep compiled ARM templates
+# Bicep compiled ARM templates (exclude compiled JSON, keep parameter files)
 infra/**/*.json
+!infra/parameters/*.json

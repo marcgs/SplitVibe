@@ -18,8 +18,8 @@ infra/
 │   ├── roleAssignment.bicep          # Generic RBAC role assignment helper
 │   └── storage.bicep                 # Blob Storage account + attachments container
 ├── parameters/
-│   ├── dev.bicepparam                # Dev environment parameter values
-│   └── prod.bicepparam               # Prod environment parameter values
+│   ├── dev.parameters.json           # Dev environment parameter values
+│   └── prod.parameters.json          # Prod environment parameter values
 └── README.md                         # This file
 ```
 
@@ -48,7 +48,7 @@ infra/
    az deployment sub create \
      --location westeurope \
      --template-file infra/main.bicep \
-     --parameters infra/parameters/dev.bicepparam \
+     --parameters infra/parameters/dev.parameters.json \
      --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
      --parameters nextAuthSecret='<RANDOM_SECRET>'
    ```
@@ -68,7 +68,7 @@ infra/
    az deployment sub create \
      --location westeurope \
      --template-file infra/main.bicep \
-     --parameters infra/parameters/prod.bicepparam \
+     --parameters infra/parameters/prod.parameters.json \
      --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
      --parameters nextAuthSecret='<RANDOM_SECRET>' \
      --parameters authGoogleId='<GOOGLE_CLIENT_ID>' \
@@ -80,10 +80,10 @@ infra/
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `location` | Yes | — | Azure region (set in `.bicepparam`) |
-| `environment` | Yes | — | `dev` or `prod` (set in `.bicepparam`) |
+| `location` | Yes | — | Azure region (set in `.parameters.json`) |
+| `environment` | Yes | — | `dev` or `prod` (set in `.parameters.json`) |
 | `baseName` | No | `splitvibe` | Base name for resource naming |
-| `postgresAdminLogin` | Yes | — | PostgreSQL admin username (set in `.bicepparam`) |
+| `postgresAdminLogin` | Yes | — | PostgreSQL admin username (set in `.parameters.json`) |
 | `postgresAdminPassword` | Yes | — | PostgreSQL admin password (**supply via CLI**) |
 | `nextAuthSecret` | Yes | — | Auth.js signing secret (**supply via CLI**) |
 | `containerImage` | No | quickstart | Container image to deploy |
@@ -143,7 +143,7 @@ In your GitHub Actions `deploy.yml` workflow, use the Azure CLI to deploy:
       az deployment sub create \
         --location westeurope \
         --template-file infra/main.bicep \
-        --parameters infra/parameters/prod.bicepparam \
+        --parameters infra/parameters/prod.parameters.json \
         --parameters postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
         --parameters nextAuthSecret='${{ secrets.NEXTAUTH_SECRET }}' \
         --parameters authGoogleId='${{ secrets.AUTH_GOOGLE_ID }}' \
