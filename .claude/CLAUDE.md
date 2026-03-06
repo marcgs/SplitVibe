@@ -101,7 +101,7 @@ SplitVibe/
 
 ## Environment Variables
 
-Copy to `.env.local` for local development without Docker. Docker Compose injects these automatically.
+Copy `.env.example` to `.env` for local development without Docker. Docker Compose injects these automatically.
 
 | Variable | Description |
 |----------|-------------|
@@ -118,3 +118,12 @@ Copy to `.env.local` for local development without Docker. Docker Compose inject
 | `AZURE_STORAGE_CONNECTION_STRING` | Full connection string (Azurite in dev) |
 
 Local Azurite credentials are hardcoded in `docker-compose.yml` (standard emulator defaults).
+
+---
+
+## Coding Conventions
+
+- Use TypeScript strict mode — no `any` types
+- Prefer server components; use `"use client"` only when needed
+- Follow existing patterns in the codebase for consistency
+- Run `npm run typecheck` and `npm run lint` before considering work done

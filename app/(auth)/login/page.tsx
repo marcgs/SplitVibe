@@ -96,7 +96,9 @@ export default function LoginPage() {
           </>
         )}
 
-        {loading && <p className="text-center text-sm text-zinc-500">Signing in...</p>}
+        {loading && (
+          <p className="text-center text-sm text-zinc-500">Signing in…</p>
+        )}
       </div>
     </div>
   );

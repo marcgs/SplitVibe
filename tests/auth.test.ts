@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
+// Mock modules before importing auth
 vi.mock("@/lib/db", () => ({
   db: {
     user: {
@@ -40,6 +41,7 @@ describe("auth configuration", () => {
   it("signIn page is configured to /login", async () => {
     vi.resetModules();
 
+    // Re-mock after resetModules
     vi.doMock("@/lib/db", () => ({
       db: { user: { upsert: vi.fn() } },
     }));
@@ -96,7 +98,7 @@ describe("auth configuration", () => {
     } | undefined;
     const providers = callArgs?.providers ?? [];
     const googleProvider = providers.find(
-      (provider) => provider.id === "google" || provider.name === "Google",
+      (p) => p.id === "google" || p.name === "Google"
     );
     expect(googleProvider).toBeDefined();
 
@@ -132,7 +134,7 @@ describe("auth configuration", () => {
     } | undefined;
     const providers = callArgs?.providers ?? [];
     const googleProvider = providers.find(
-      (provider) => provider.id === "google" || provider.name === "Google",
+      (p) => p.id === "google" || p.name === "Google"
     );
     expect(googleProvider).toBeUndefined();
   });
@@ -167,7 +169,7 @@ describe("auth configuration", () => {
     } | undefined;
     const providers = callArgs?.providers ?? [];
     const credentialsProvider = providers.find(
-      (provider) => provider.id === "credentials" || provider.type === "credentials",
+      (p) => p.id === "credentials" || p.type === "credentials"
     );
     expect(credentialsProvider).toBeDefined();
 

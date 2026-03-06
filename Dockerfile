@@ -17,31 +17,6 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# Stage: runner — production image
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
-
 # Stage: dev — local development with hot reload
 FROM base AS dev
 WORKDIR /app
@@ -60,5 +35,38 @@ EXPOSE 3000
 
 CMD ["npm", "run", "dev"]
 
-# Default final stage for plain `docker build` should be the production runtime.
-FROM runner AS production
+# Stage: runner — production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy Prisma schema and config for running migrations at container startup.
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# Install Prisma CLI and dotenv globally so prisma.config.ts can resolve its imports
+# (standalone output omits prisma CLI and dotenv; NODE_PATH in start.sh links them).
+RUN npm install -g prisma@7.4.1 dotenv
+
+COPY start.sh ./
+RUN chmod +x start.sh
+
+USER nextjs
+
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["sh", "start.sh"]

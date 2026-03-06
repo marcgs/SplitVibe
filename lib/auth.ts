@@ -16,9 +16,10 @@ const mockProvider = Credentials({
     const email = credentials?.email as string | undefined;
     if (!email) return null;
 
-    const mock = mockUsers.find((user) => user.email === email);
+    const mock = mockUsers.find((u) => u.email === email);
     if (!mock) return null;
 
+    // Upsert the user so a DB row always exists
     const user = await db.user.upsert({
       where: { email: mock.email },
       update: { name: mock.name, image: mock.image },

@@ -1,10 +1,9 @@
 ---
 name: validate-pr
 description: >
-  Validates a PR's acceptance criteria using the most appropriate strategy:
-  browser-based E2E tests (Playwright MCP), API calls, CLI/terminal commands,
-  or unit test execution. Reads the linked GitHub issue as the single source
-  of truth for acceptance criteria.
+  Validates a PR's acceptance criteria from the user's perspective using
+  browser-based E2E tests (Playwright MCP) and API calls. Reads the linked
+  GitHub issue as the single source of truth for acceptance criteria.
 ---
 
 # Validate PR Acceptance Criteria
@@ -31,41 +30,66 @@ A pull request number or URL from the **marcgs/SplitVibe** repository.
 
 ### 2. Classify each acceptance criterion
 
-For every acceptance criterion, classify it into a **validation strategy**:
+For every acceptance criterion, assign **one or more** validation
+strategies. A single criterion can (and often should) be validated
+through multiple complementary strategies.
 
-- **🌐 Browser (E2E)** — Criterion involves UI (pages, forms,
-  navigation, toasts, modals). Validate with Playwright MCP browser
-  tools against `http://localhost:3000`.
+Available strategies:
+
+- **🌐 Browser (E2E)** — Criterion has **any** observable UI impact:
+  pages, forms, navigation, lists, toasts, modals, visual feedback.
+  Validate with Playwright MCP browser tools against
+  `http://localhost:3000`.
 - **🔌 API** — Criterion involves HTTP endpoints (status codes,
   response shapes, auth guards). Validate with `curl`/`fetch`
   against `http://localhost:3000/api/…`.
-- **🧪 Unit / Integration test** — Criterion involves logic, schema,
-  data transformations, or domain rules. Run `npx vitest run <path>`
-  or `npm test`. Note gaps if no tests exist.
-- **🛠️ CLI / Infrastructure** — Criterion involves DB state,
-  migrations, Prisma schema, env config, Docker, or files. Run the
-  appropriate CLI command and inspect output.
-- **📄 Code review** — Criterion involves code quality, patterns, or
-  architectural constraints. Inspect the PR diff and run
-  `npm run typecheck` and `npm run lint`.
 
-### 3. Confirm prerequisites
+> **🌐 Browser-first rule:** Always prefer Browser (E2E) validation.
+> If a criterion has any user-visible aspect — pages, forms, lists,
+> feedback messages, navigation — it **MUST** be validated through
+> the browser. API validation is a complement for verifying response
+> shapes, status codes, or auth guards — never a substitute for
+> browser testing of UI-facing criteria.
 
-Before running validations, check what's needed:
+### 3. Check out the PR branch in a worktree
 
-- **For 🌐 Browser or 🔌 API criteria:** use `browser_navigate` to reach
-  `http://localhost:3000`. If unreachable, tell the user:
-  > Dev server is not running. Please start it with `npm run dev` or
-  > `docker compose --profile full up` and re-run this agent.
-- **For 🧪 Unit/Integration criteria:** verify `node_modules` exists
-  (run `npm ls vitest` to confirm).
-- **For 🛠️ CLI/Infrastructure criteria:** verify Docker is running if
-  database access is needed (`docker compose ps`).
+Use a **git worktree** so the user's current checkout is not disturbed.
 
-Only stop for the strategies that are blocked — continue validating criteria
-that have their prerequisites met.
+- Extract the **head branch name** from the PR metadata fetched in step 1.
+- Remove any stale worktree from a previous run:
+  `git worktree remove ../splitvibe-validate --force 2>/dev/null`
+- Create the worktree:
+  `git worktree add ../splitvibe-validate <branch>`
+- **`cd ../splitvibe-validate`** — all subsequent commands (npm install,
+  prisma, npm run dev, docker compose) run from this directory.
+- `npm install` — ensure dependencies are up to date for this branch.
 
-### 4. Validate each criterion
+### 4. Start a clean dev environment
+
+Always start from a **clean slate** to avoid stale state, old code, or
+leftover data from previous runs.
+
+1. **Tear down anything already running:**
+   - Kill any process on port 3000
+     (`lsof -ti:3000 | xargs kill 2>/dev/null`).
+   - `docker compose down -v` — stop and remove all containers and
+     volumes.
+2. **Start backend services:**
+   - `docker compose up -d db storage` — start Postgres and Azurite.
+   - Wait for Postgres to be ready
+     (`docker compose exec db pg_isready -U postgres`; retry if needed).
+3. **Apply migrations:**
+   - `npx prisma migrate dev` — apply pending migrations to a fresh DB.
+4. **Start the Next.js dev server** (async/detached so it keeps running):
+   - `npm run dev`
+5. **Wait for the server to be ready:**
+   - Poll `curl -sf http://localhost:3000` with retries (up to ~30 s).
+   - If it still fails after retries, mark all criteria as
+     ⏭️ **Blocked** and skip to step 7 (report).
+
+Only proceed to validation once the dev server is reachable.
+
+### 5. Validate each criterion
 
 Execute each criterion using its assigned strategy:
 
@@ -85,33 +109,13 @@ Execute each criterion using its assigned strategy:
 3. Assert: status code, response body shape, error messages, headers.
 4. For authenticated endpoints, include the session token/cookie if available.
 
-#### 🧪 Unit / Integration test
-
-1. Identify the test file(s) covering the criterion.
-2. Run: `npx vitest run <path/to/test.ts>`.
-3. Assert: all relevant tests pass with zero failures.
-4. If no tests exist for the criterion, report as
-   ⚠️ **GAP — no test coverage found**.
-
-#### 🛠️ CLI / Infrastructure
-
-1. Run the relevant command in the terminal.
-2. Assert: expected output, exit code 0, files exist, schema is valid, etc.
-3. Capture terminal output as evidence.
-
-#### 📄 Code review
-
-1. Inspect the PR diff for the relevant files.
-2. Run `npm run typecheck` and `npm run lint`.
-3. Assert: no errors, patterns match the criterion requirements.
-
-### 5. On failure
+### 6. On failure
 
 - Record the failing assertion, evidence (screenshot or terminal output), and
   context (URL, command, test name).
 - **Continue** with remaining criteria — do not abort the entire run.
 
-### 6. Report results
+### 7. Report results
 
 ```markdown
 ## Validation Report — PR #<number>
@@ -121,28 +125,23 @@ Execute each criterion using its assigned strategy:
 | # | Criterion | Strategy | Result | Notes |
 |---|-----------|----------|--------|-------|
 | 1 | <text> | 🌐 Browser | ✅ PASS | Screenshot: <ref> |
-| 2 | <text> | 🔌 API | ❌ FAIL | Expected 201, got 500 |
-| 3 | <text> | 🧪 Unit test | ✅ PASS | 5/5 passed |
-| 4 | <text> | 🛠️ CLI | ✅ PASS | Exit code 0 |
-| 5 | <text> | 📄 Review | ✅ PASS | Typecheck clean |
-| 6 | <text> | 🧪 Unit test | ⚠️ GAP | No test coverage |
+| 2 | <text> | 🌐 Browser + 🔌 API | ❌ FAIL | Expected 201, got 500 |
+| 3 | <text> | 🔌 API | ✅ PASS | Correct shape + 200 |
+| 4 | <text> | 🌐 Browser | ⏭️ BLOCKED | Dev server unreachable |
 
 ### Summary
 
 - ✅ **Passed:** X
 - ❌ **Failed:** Y
-- ⚠️ **Gaps:** Z (no test coverage)
-- ⏭️ **Blocked:** W (prerequisites not met)
+- ⏭️ **Blocked:** Z (prerequisites not met)
 ```
 
 **Final conclusion — use exactly one of:**
 
 - ✅ **All acceptance criteria for this PR are verified.**
 - ❌ **Some acceptance criteria failed validation. See details above.**
-- ⚠️ **All criteria passed but some have no test coverage.
-  Consider adding tests.**
 
-### 7. Post results to the PR
+### 8. Post results to the PR
 
 After producing the validation report, **post it as a comment on the
 PR in GitHub**. Use the GitHub API (or the available GitHub MCP tools)
@@ -154,3 +153,13 @@ step 6.
 - The comment should contain the complete report table, summary, and
   conclusion so that reviewers can see the validation status directly
   in the PR timeline without re-running the agent.
+
+### 9. Tear down the dev environment
+
+After posting results, **always** clean up:
+
+1. Stop the Next.js dev server (kill the process on port 3000).
+2. `docker compose down -v` — stop and remove all containers and volumes.
+3. `cd` back to the original repository root.
+4. `git worktree remove ../splitvibe-validate --force` — remove the
+   temporary worktree.

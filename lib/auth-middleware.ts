@@ -14,9 +14,10 @@ const mockProvider = Credentials({
     const email = credentials?.email as string | undefined;
     if (!email) return null;
 
-    const mock = mockUsers.find((user) => user.email === email);
+    const mock = mockUsers.find((u) => u.email === email);
     if (!mock) return null;
 
+    // Return mock user for JWT - database upsert happens in the API route
     return {
       id: mock.id,
       email: mock.email,
