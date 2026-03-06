@@ -38,12 +38,6 @@ param nextAuthSecretSecretUri string
 @description('AZURE_STORAGE_ACCOUNT_NAME Key Vault secret URI')
 param storageAccountNameSecretUri string
 
-@description('AZURE_STORAGE_ACCOUNT_KEY Key Vault secret URI')
-param storageAccountKeySecretUri string
-
-@description('AZURE_STORAGE_CONNECTION_STRING Key Vault secret URI')
-param storageConnectionStringSecretUri string
-
 @description('AUTH_GOOGLE_ID Key Vault secret URI')
 param authGoogleIdSecretUri string
 
@@ -58,6 +52,9 @@ param managedIdentityId string
 
 @description('Container port to route ingress traffic to')
 param targetPort int = 3000
+
+@description('Managed identity client ID for DefaultAzureCredential')
+param managedIdentityClientId string
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: last(split(logAnalyticsWorkspaceId, '/'))!
@@ -128,16 +125,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: managedIdentityId
         }
         {
-          name: 'azure-storage-account-key'
-          keyVaultUrl: storageAccountKeySecretUri
-          identity: managedIdentityId
-        }
-        {
-          name: 'azure-storage-connection-string'
-          keyVaultUrl: storageConnectionStringSecretUri
-          identity: managedIdentityId
-        }
-        {
           name: 'auth-google-id'
           keyVaultUrl: authGoogleIdSecretUri
           identity: managedIdentityId
@@ -176,16 +163,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               secretRef: 'azure-storage-account-name'
             }
             {
-              name: 'AZURE_STORAGE_ACCOUNT_KEY'
-              secretRef: 'azure-storage-account-key'
-            }
-            {
-              name: 'AZURE_STORAGE_CONNECTION_STRING'
-              secretRef: 'azure-storage-connection-string'
-            }
-            {
               name: 'AZURE_STORAGE_CONTAINER_NAME'
               value: 'attachments'
+            }
+            {
+              name: 'AZURE_CLIENT_ID'
+              value: managedIdentityClientId
             }
             {
               name: 'AUTH_GOOGLE_ID'

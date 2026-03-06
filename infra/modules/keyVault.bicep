@@ -34,13 +34,6 @@ param authGoogleId string
 @description('Google OAuth client secret')
 param authGoogleSecret string
 
-// Reference the existing storage account to retrieve keys without exposing them
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
-  name: storageAccountName
-}
-
-var storageKey = storageAccount.listKeys().keys[0].value
-var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=core.windows.net'
 var databaseUrl = 'postgresql://${postgresAdminLogin}:${uriComponent(postgresAdminPassword)}@${postgresFqdn}:5432/${postgresDatabaseName}?sslmode=require'
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
@@ -82,22 +75,6 @@ resource secretStorageAccountName 'Microsoft.KeyVault/vaults/secrets@2023-07-01'
   }
 }
 
-resource secretStorageAccountKey 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVault
-  name: 'AZURE-STORAGE-ACCOUNT-KEY'
-  properties: {
-    value: storageKey
-  }
-}
-
-resource secretStorageConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVault
-  name: 'AZURE-STORAGE-CONNECTION-STRING'
-  properties: {
-    value: storageConnectionString
-  }
-}
-
 resource secretAuthGoogleId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'AUTH-GOOGLE-ID'
@@ -131,12 +108,6 @@ output nextAuthSecretSecretUri string = secretNextAuthSecret.properties.secretUr
 
 @description('AZURE_STORAGE_ACCOUNT_NAME secret URI')
 output storageAccountNameSecretUri string = secretStorageAccountName.properties.secretUri
-
-@description('AZURE_STORAGE_ACCOUNT_KEY secret URI')
-output storageAccountKeySecretUri string = secretStorageAccountKey.properties.secretUri
-
-@description('AZURE_STORAGE_CONNECTION_STRING secret URI')
-output storageConnectionStringSecretUri string = secretStorageConnectionString.properties.secretUri
 
 @description('AUTH_GOOGLE_ID secret URI')
 output authGoogleIdSecretUri string = secretAuthGoogleId.properties.secretUri

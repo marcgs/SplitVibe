@@ -7,3 +7,6 @@ param postgresAdminLogin = 'splitvibeadmin'
 // postgresAdminPassword — supply via CLI or CI secret: --parameters postgresAdminPassword=<value>
 // nextAuthSecret       — supply via CLI or CI secret: --parameters nextAuthSecret=<value>
 // containerImage       — supply via CI: --parameters containerImage=<acr-login-server>/splitvibe:<tag>
+// targetPort           — default 3000 (correct for SplitVibe app image)
+// authGoogleId         — supply via CI secret: --parameters authGoogleId=<value>
+// authGoogleSecret     — supply via CI secret: --parameters authGoogleSecret=<value>
