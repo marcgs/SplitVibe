@@ -67,6 +67,13 @@ infra/
    When deploying with the SplitVibe application image, supply the Google
    OAuth credentials, custom domain, and the container image reference:
 
+   Keep `CUSTOM_DOMAIN` in your local `.env`/`.env.local` (gitignored), then
+   load it in your shell before deploying:
+
+   ```bash
+   set -a; source .env; set +a
+   ```
+
    ```bash
     az deployment sub create \
       --location northeurope \
@@ -74,7 +81,7 @@ infra/
       --parameters infra/parameters/prod.parameters.json \
       --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
       --parameters nextAuthSecret='<RANDOM_SECRET>' \
-      --parameters customDomain='<CUSTOM_DOMAIN>' \
+      --parameters customDomain="$CUSTOM_DOMAIN" \
       --parameters authGoogleId='<GOOGLE_CLIENT_ID>' \
       --parameters authGoogleSecret='<GOOGLE_CLIENT_SECRET>' \
       --parameters containerImage='<ACR_LOGIN_SERVER>/splitvibe:<TAG>'
