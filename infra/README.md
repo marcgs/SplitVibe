@@ -65,18 +65,19 @@ infra/
 3. **Deploy the prod environment:**
 
    When deploying with the SplitVibe application image, supply the Google
-   OAuth credentials and the container image reference:
+   OAuth credentials, custom domain, and the container image reference:
 
    ```bash
-   az deployment sub create \
-     --location northeurope \
-     --template-file infra/main.bicep \
-     --parameters infra/parameters/prod.parameters.json \
-     --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
-     --parameters nextAuthSecret='<RANDOM_SECRET>' \
-     --parameters authGoogleId='<GOOGLE_CLIENT_ID>' \
-     --parameters authGoogleSecret='<GOOGLE_CLIENT_SECRET>' \
-     --parameters containerImage='<ACR_LOGIN_SERVER>/splitvibe:<TAG>'
+    az deployment sub create \
+      --location northeurope \
+      --template-file infra/main.bicep \
+      --parameters infra/parameters/prod.parameters.json \
+      --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
+      --parameters nextAuthSecret='<RANDOM_SECRET>' \
+      --parameters customDomain='<CUSTOM_DOMAIN>' \
+      --parameters authGoogleId='<GOOGLE_CLIENT_ID>' \
+      --parameters authGoogleSecret='<GOOGLE_CLIENT_SECRET>' \
+      --parameters containerImage='<ACR_LOGIN_SERVER>/splitvibe:<TAG>'
    ```
 
 ## Parameters
@@ -91,7 +92,8 @@ infra/
 | `nextAuthSecret` | Yes | — | Auth.js signing secret (**supply via CLI**) |
 | `containerImage` | No | quickstart | Container image to deploy |
 | `targetPort` | No | `3000` | Container port (`80` for quickstart, `3000` for SplitVibe) |
-| `appUrl` | No | `''` | Public URL for Auth.js (update after first deploy) |
+| `appUrl` | No | `''` | Public URL for Auth.js fallback (used when `customDomain` is not provided) |
+| `customDomain` | No | `''` | Public custom hostname (for example `app.example.com`); when set, `AUTH_URL` is derived as `https://<customDomain>` |
 | `authGoogleId` | No | `''` | Google OAuth client ID |
 | `authGoogleSecret` | No | `''` | Google OAuth client secret (**supply via CLI**) |
 
@@ -130,6 +132,15 @@ account keys are passed to the Container App.
 - **Blob Storage** has `allowBlobPublicAccess: false` — accessible only via the Managed Identity (no account keys are injected).
 - **Key Vault** uses RBAC authorization; only the Container App's Managed Identity has `Secrets User` access.
 
+## Auth URL behavior
+
+`AUTH_URL` in the Container App is derived from deployment parameters:
+
+- If `customDomain` is provided, `AUTH_URL=https://<customDomain>`.
+- Otherwise, `AUTH_URL` uses `appUrl`.
+
+For production environments with a bound custom domain, set `customDomain` (via secure CLI/pipeline variables, not committed parameter files) so redeployments don't revert Auth.js callback URLs to the default Container Apps FQDN.
+
 ## Re-running Deployments
 
 Bicep deployments are **idempotent**. Re-running the same command will update existing resources without creating duplicates.
@@ -149,6 +160,7 @@ In your GitHub Actions `deploy.yml` workflow, use the Azure CLI to deploy:
         --parameters infra/parameters/prod.parameters.json \
         --parameters postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
         --parameters nextAuthSecret='${{ secrets.NEXTAUTH_SECRET }}' \
+        --parameters customDomain='${{ secrets.CUSTOM_DOMAIN }}' \
         --parameters authGoogleId='${{ secrets.AUTH_GOOGLE_ID }}' \
         --parameters authGoogleSecret='${{ secrets.AUTH_GOOGLE_SECRET }}' \
         --parameters containerImage='${{ env.ACR_LOGIN_SERVER }}/splitvibe:${{ github.sha }}' \

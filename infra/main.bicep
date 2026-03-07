@@ -35,8 +35,11 @@ param nextAuthSecret string
 @description('Container image to deploy (defaults to quickstart placeholder)')
 param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
-@description('Public application URL for Auth.js (update after initial deployment with actual FQDN)')
+@description('Public application URL for Auth.js (used when customDomain is not provided)')
 param appUrl string = ''
+
+@description('Custom domain hostname for the app (for example app.example.com). When set, AUTH_URL is derived as https://<customDomain>.')
+param customDomain string = ''
 
 @description('Container port (default 3000 for SplitVibe; use 80 for placeholder quickstart image)')
 param targetPort int = 3000
@@ -61,6 +64,7 @@ var containerAppName = 'ca-${baseName}-${environment}'
 var logAnalyticsName = 'log-${baseName}-${environment}'
 var vnetName = 'vnet-${baseName}-${environment}'
 var managedIdentityName = 'id-${baseName}-${environment}'
+var effectiveAppUrl = !empty(customDomain) ? 'https://${customDomain}' : appUrl
 
 // ── Resource Group ──────────────────────────────────────────────────────────
 
@@ -225,7 +229,7 @@ module containerApps 'modules/containerApps.bicep' = {
     storageAccountNameSecretUri: keyVault.outputs.storageAccountNameSecretUri
     authGoogleIdSecretUri: keyVault.outputs.authGoogleIdSecretUri
     authGoogleSecretSecretUri: keyVault.outputs.authGoogleSecretSecretUri
-    appUrl: appUrl
+    appUrl: effectiveAppUrl
     managedIdentityId: managedIdentity.outputs.id
     managedIdentityClientId: managedIdentity.outputs.clientId
     targetPort: targetPort
