@@ -48,6 +48,11 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Allow'
+    }
   }
 }
 
@@ -75,7 +80,7 @@ resource secretStorageAccountName 'Microsoft.KeyVault/vaults/secrets@2023-07-01'
   }
 }
 
-resource secretAuthGoogleId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource secretAuthGoogleId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(authGoogleId)) {
   parent: keyVault
   name: 'AUTH-GOOGLE-ID'
   properties: {
@@ -83,7 +88,7 @@ resource secretAuthGoogleId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   }
 }
 
-resource secretAuthGoogleSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource secretAuthGoogleSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(authGoogleSecret)) {
   parent: keyVault
   name: 'AUTH-GOOGLE-SECRET'
   properties: {
@@ -110,7 +115,7 @@ output nextAuthSecretSecretUri string = secretNextAuthSecret.properties.secretUr
 output storageAccountNameSecretUri string = secretStorageAccountName.properties.secretUri
 
 @description('AUTH_GOOGLE_ID secret URI')
-output authGoogleIdSecretUri string = secretAuthGoogleId.properties.secretUri
+output authGoogleIdSecretUri string = !empty(authGoogleId) ? secretAuthGoogleId.properties.secretUri : ''
 
 @description('AUTH_GOOGLE_SECRET secret URI')
-output authGoogleSecretSecretUri string = secretAuthGoogleSecret.properties.secretUri
+output authGoogleSecretSecretUri string = !empty(authGoogleSecret) ? secretAuthGoogleSecret.properties.secretUri : ''

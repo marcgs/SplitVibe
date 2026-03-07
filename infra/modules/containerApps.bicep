@@ -39,10 +39,10 @@ param nextAuthSecretSecretUri string
 param storageAccountNameSecretUri string
 
 @description('AUTH_GOOGLE_ID Key Vault secret URI')
-param authGoogleIdSecretUri string
+param authGoogleIdSecretUri string = ''
 
 @description('AUTH_GOOGLE_SECRET Key Vault secret URI')
-param authGoogleSecretSecretUri string
+param authGoogleSecretSecretUri string = ''
 
 @description('Public app URL')
 param appUrl string
@@ -55,6 +55,80 @@ param targetPort int = 3000
 
 @description('Managed identity client ID for DefaultAzureCredential')
 param managedIdentityClientId string
+
+var hasGoogleAuthSecrets = !empty(authGoogleIdSecretUri) && !empty(authGoogleSecretSecretUri)
+var containerSecrets = concat([
+  {
+    name: 'database-url'
+    keyVaultUrl: databaseUrlSecretUri
+    identity: managedIdentityId
+  }
+  {
+    name: 'nextauth-secret'
+    keyVaultUrl: nextAuthSecretSecretUri
+    identity: managedIdentityId
+  }
+  {
+    name: 'azure-storage-account-name'
+    keyVaultUrl: storageAccountNameSecretUri
+    identity: managedIdentityId
+  }
+], !hasGoogleAuthSecrets ? [] : [
+  {
+    name: 'auth-google-id'
+    keyVaultUrl: authGoogleIdSecretUri
+    identity: managedIdentityId
+  }
+  {
+    name: 'auth-google-secret'
+    keyVaultUrl: authGoogleSecretSecretUri
+    identity: managedIdentityId
+  }
+])
+
+var containerEnv = concat([
+  {
+    name: 'DATABASE_URL'
+    secretRef: 'database-url'
+  }
+  {
+    name: 'NEXTAUTH_SECRET'
+    secretRef: 'nextauth-secret'
+  }
+  {
+    name: 'AUTH_URL'
+    value: appUrl
+  }
+  {
+    name: 'AZURE_STORAGE_ACCOUNT_NAME'
+    secretRef: 'azure-storage-account-name'
+  }
+  {
+    name: 'AZURE_STORAGE_CONTAINER_NAME'
+    value: 'attachments'
+  }
+  {
+    name: 'AZURE_CLIENT_ID'
+    value: managedIdentityClientId
+  }
+  {
+    name: 'NODE_ENV'
+    value: 'production'
+  }
+  {
+    name: 'PORT'
+    value: '3000'
+  }
+], !hasGoogleAuthSecrets ? [] : [
+  {
+    name: 'AUTH_GOOGLE_ID'
+    secretRef: 'auth-google-id'
+  }
+  {
+    name: 'AUTH_GOOGLE_SECRET'
+    secretRef: 'auth-google-secret'
+  }
+])
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: last(split(logAnalyticsWorkspaceId, '/'))!
@@ -108,33 +182,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: managedIdentityId
         }
       ]
-      secrets: [
-        {
-          name: 'database-url'
-          keyVaultUrl: databaseUrlSecretUri
-          identity: managedIdentityId
-        }
-        {
-          name: 'nextauth-secret'
-          keyVaultUrl: nextAuthSecretSecretUri
-          identity: managedIdentityId
-        }
-        {
-          name: 'azure-storage-account-name'
-          keyVaultUrl: storageAccountNameSecretUri
-          identity: managedIdentityId
-        }
-        {
-          name: 'auth-google-id'
-          keyVaultUrl: authGoogleIdSecretUri
-          identity: managedIdentityId
-        }
-        {
-          name: 'auth-google-secret'
-          keyVaultUrl: authGoogleSecretSecretUri
-          identity: managedIdentityId
-        }
-      ]
+      secrets: containerSecrets
     }
     template: {
       containers: [
@@ -145,48 +193,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json(environment == 'prod' ? '0.5' : '0.25')
             memory: environment == 'prod' ? '1Gi' : '0.5Gi'
           }
-          env: [
-            {
-              name: 'DATABASE_URL'
-              secretRef: 'database-url'
-            }
-            {
-              name: 'NEXTAUTH_SECRET'
-              secretRef: 'nextauth-secret'
-            }
-            {
-              name: 'AUTH_URL'
-              value: appUrl
-            }
-            {
-              name: 'AZURE_STORAGE_ACCOUNT_NAME'
-              secretRef: 'azure-storage-account-name'
-            }
-            {
-              name: 'AZURE_STORAGE_CONTAINER_NAME'
-              value: 'attachments'
-            }
-            {
-              name: 'AZURE_CLIENT_ID'
-              value: managedIdentityClientId
-            }
-            {
-              name: 'AUTH_GOOGLE_ID'
-              secretRef: 'auth-google-id'
-            }
-            {
-              name: 'AUTH_GOOGLE_SECRET'
-              secretRef: 'auth-google-secret'
-            }
-            {
-              name: 'NODE_ENV'
-              value: 'production'
-            }
-            {
-              name: 'PORT'
-              value: '3000'
-            }
-          ]
+          env: containerEnv
         }
       ]
       scale: {

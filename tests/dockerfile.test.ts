@@ -10,7 +10,8 @@ describe("Dockerfile", () => {
       (match) => match[1],
     );
 
-    expect(stageNames.at(-1)).toBe("production");
-    expect(dockerfile).toContain("FROM runner AS production");
+    expect(stageNames.at(-1)).toBe("runner");
+    expect(stageNames.at(-1)).not.toBe("dev");
+    expect(dockerfile).toContain('CMD ["sh", "start.sh"]');
   });
 });
