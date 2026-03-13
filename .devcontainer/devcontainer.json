@@ -1,0 +1,45 @@
+{
+  "name": "SplitVibe",
+  "dockerComposeFile": ["../docker-compose.yml", "docker-compose.yml"],
+  "service": "devcontainer",
+  "workspaceFolder": "/workspaces/SplitVibe",
+  "forwardPorts": [3000, 5432, 5555, 10000],
+  "portsAttributes": {
+    "3000": { "label": "Next.js", "onAutoForward": "notify" },
+    "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
+    "5555": { "label": "Prisma Studio", "onAutoForward": "notify" },
+    "10000": { "label": "Azurite Blob", "onAutoForward": "silent" }
+  },
+  "remoteEnv": {
+    "DATABASE_URL": "postgresql://postgres:postgres@db:5432/splitvibe",
+    "AUTH_SECRET": "devcontainer-secret-do-not-use-in-production",
+    "AUTH_URL": "http://localhost:3000",
+    "AZURE_STORAGE_ACCOUNT_NAME": "devstoreaccount1",
+    "AZURE_STORAGE_ACCOUNT_KEY": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+    "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://storage:10000/devstoreaccount1;",
+    "AZURE_STORAGE_CONTAINER_NAME": "splitvibe-attachments",
+    "AZURITE_ACCOUNT_NAME": "devstoreaccount1",
+    "AZURITE_ACCOUNT_KEY": "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+    "AZURITE_BLOB_ENDPOINT": "http://storage:10000/devstoreaccount1",
+    "USE_AZURITE": "true",
+    "FX_API_BASE_URL": "https://api.frankfurter.app",
+    "NEXT_PUBLIC_APP_URL": "http://localhost:3000",
+    "NODE_ENV": "development"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "Prisma.prisma",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker",
+        "ms-playwright.playwright"
+      ]
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
+}

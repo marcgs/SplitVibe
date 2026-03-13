@@ -1,0 +1,11 @@
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/typescript-node:20
+    volumes:
+      - ..:/workspaces/SplitVibe:cached
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_started
