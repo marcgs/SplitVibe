@@ -233,6 +233,7 @@ module containerApps 'modules/containerApps.bicep' = {
     managedIdentityId: managedIdentity.outputs.id
     managedIdentityClientId: managedIdentity.outputs.clientId
     targetPort: targetPort
+    customDomain: customDomain
   }
 }
 

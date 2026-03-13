@@ -56,6 +56,9 @@ param targetPort int = 3000
 @description('Managed identity client ID for DefaultAzureCredential')
 param managedIdentityClientId string
 
+@description('Custom domain hostname (empty = no custom domain binding)')
+param customDomain string = ''
+
 var hasGoogleAuthSecrets = !empty(authGoogleIdSecretUri) && !empty(authGoogleSecretSecretUri)
 var containerSecrets = concat([
   {
@@ -158,6 +161,16 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
   }
 }
 
+resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (!empty(customDomain)) {
+  name: 'cert-${replace(customDomain, '.', '-')}'
+  parent: containerAppsEnvironment
+  location: location
+  properties: {
+    subjectName: customDomain
+    domainControlValidation: 'CNAME'
+  }
+}
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
@@ -175,6 +188,13 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: targetPort
         transport: 'http'
         allowInsecure: false
+        customDomains: !empty(customDomain) ? [
+          {
+            name: customDomain
+            certificateId: managedCert.id
+            bindingType: 'SniEnabled'
+          }
+        ] : []
       }
       registries: [
         {
