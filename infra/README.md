@@ -75,7 +75,6 @@ infra/
 | `targetPort` | No | `3000` | Container port (`80` for quickstart, `3000` for SplitVibe) |
 | `appUrl` | No | `''` | Public URL for Auth.js fallback (used when `customDomain` is not provided) |
 | `customDomain` | No | `''` | Public custom hostname (for example `app.example.com`); when set, `AUTH_URL` is derived as `https://<customDomain>` |
-| `domainCertReady` | No | `false` | Set to `true` on the second deployment pass to bind the managed TLS certificate (see [Custom Domain & TLS](#custom-domain--tls)) |
 | `authGoogleId` | No | `''` | Google OAuth client ID |
 | `authGoogleSecret` | No | `''` | Google OAuth client secret (**supply via CLI**) |
 
@@ -116,12 +115,13 @@ account keys are passed to the Container App.
 
 ## Custom Domain & TLS
 
-When `customDomain` is set, `bin/deploy` binds the domain to the Container App with a managed TLS certificate. Azure requires the hostname to be registered on the app before a certificate can be provisioned, so `bin/deploy` runs a **two-phase deployment** automatically:
+Domain binding is handled imperatively by `bin/domain` (called automatically from `bin/deploy` when `customDomain` is set). This uses `az containerapp hostname` CLI commands instead of Bicep, avoiding the two-phase deployment that was previously needed.
 
-| Phase | `domainCertReady` | What happens |
-|-------|-------------------|--------------|
-| 1 | `false` | Registers the hostname with `bindingType: Disabled`; no certificate yet |
-| 2 | `true` | Provisions the managed certificate (CNAME-validated) and upgrades to `bindingType: SniEnabled` |
+```bash
+bin/domain prod        # bind custom domain with managed TLS cert (idempotent)
+```
+
+The script adds the hostname, provisions a managed certificate (CNAME-validated), and binds it with SNI — all idempotently. If the domain is already bound with TLS, it skips.
 
 **DNS prerequisites** — before the first deploy with a custom domain, create these records on your DNS provider:
 

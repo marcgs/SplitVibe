@@ -96,14 +96,9 @@ deploy_cmd+=(--parameters "authGoogleSecret=$AUTH_GOOGLE_SECRET")
 
 "${deploy_cmd[@]}"
 
-# Phase 2: if custom domain is set, re-deploy with domainCertReady=true
-# to provision the managed certificate and bind it with SniEnabled.
-# Phase 1 registered the hostname (Disabled binding); Phase 2 creates the
-# cert and upgrades to SniEnabled.
+# Bind custom domain with managed TLS certificate (idempotent)
 if [ -n "${CUSTOM_DOMAIN:-}" ]; then
-  echo "==> Binding managed TLS certificate for $CUSTOM_DOMAIN (phase 2)..."
-  deploy_cmd+=(--parameters "domainCertReady=true")
-  "${deploy_cmd[@]}"
+  bin/domain "$ENV"
 fi
 
 # Print summary

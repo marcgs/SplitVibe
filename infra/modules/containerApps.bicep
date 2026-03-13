@@ -56,11 +56,6 @@ param targetPort int = 3000
 @description('Managed identity client ID for DefaultAzureCredential')
 param managedIdentityClientId string
 
-@description('Custom domain hostname (empty = no custom domain binding)')
-param customDomain string = ''
-
-@description('Set to true on the second deployment pass after the managed certificate has been provisioned')
-param domainCertReady bool = false
 
 var hasGoogleAuthSecrets = !empty(authGoogleIdSecretUri) && !empty(authGoogleSecretSecretUri)
 var containerSecrets = concat([
@@ -164,18 +159,6 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
   }
 }
 
-// Phase 1 (domainCertReady=false): container app registers the hostname with Disabled binding.
-// Phase 2 (domainCertReady=true): managed cert exists, container app binds it with SniEnabled.
-resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (!empty(customDomain) && domainCertReady) {
-  name: 'cert-${replace(customDomain, '.', '-')}'
-  parent: containerAppsEnvironment
-  location: location
-  properties: {
-    subjectName: customDomain
-    domainControlValidation: 'CNAME'
-  }
-}
-
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
@@ -193,13 +176,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: targetPort
         transport: 'http'
         allowInsecure: false
-        customDomains: !empty(customDomain) ? [
-          {
-            name: customDomain
-            certificateId: domainCertReady ? managedCert.id : null
-            bindingType: domainCertReady ? 'SniEnabled' : 'Disabled'
-          }
-        ] : []
       }
       registries: [
         {

@@ -59,12 +59,13 @@ Required environment variables (set in `.env`):
 
 ### Custom Domain & TLS
 
-When `CUSTOM_DOMAIN_PROD` (or `CUSTOM_DOMAIN_DEV`) is set, `bin/deploy` automatically binds the domain to the Container App with a managed TLS certificate. Azure requires a **two-phase deployment** for this:
+When `CUSTOM_DOMAIN_PROD` (or `CUSTOM_DOMAIN_DEV`) is set, `bin/deploy` automatically calls `bin/domain` after the Bicep deployment to bind the domain with a managed TLS certificate. You can also run it standalone:
 
-1. **Phase 1** — registers the hostname on the Container App with TLS disabled
-2. **Phase 2** — provisions the managed certificate (CNAME-validated) and upgrades the binding to SNI-enabled TLS
+```bash
+bin/domain prod        # bind custom domain with managed TLS cert (idempotent)
+```
 
-Both phases run automatically within a single `bin/deploy` invocation. The first deployment with a new custom domain takes longer (~5–10 extra minutes) while Azure provisions the certificate. Subsequent deploys are idempotent and skip certificate provisioning.
+The script is idempotent — if the domain is already bound with TLS, it skips. The first run takes ~5–10 minutes while Azure provisions the certificate.
 
 **Prerequisites:** DNS records (CNAME + TXT verification) must be configured before the first deploy. See [`infra/README.md`](infra/README.md) for details.
 
