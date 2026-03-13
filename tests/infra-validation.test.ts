@@ -29,7 +29,7 @@ describe("infra validation", () => {
     expect(keyVaultModule).toContain("if (!empty(authGoogleSecret))");
     expect(keyVaultModule).toContain("output authGoogleIdSecretUri string = !empty(authGoogleId)");
     expect(keyVaultModule).toContain(
-      "output authGoogleSecretSecretUri string = !empty(authGoogleSecret)",
+      "output authGoogleSecretSecretUri string = !empty(authGoogleId)",
     );
 
     expect(containerAppsModule).toContain("var hasGoogleAuthSecrets");
