@@ -64,10 +64,10 @@ IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || date +%s)
 IMAGE_REF="$ACR_LOGIN_SERVER/splitvibe:$IMAGE_TAG"
 
 echo "==> Building image: $IMAGE_REF"
-docker build -t "$IMAGE_REF" --target runner .
+docker build -t "$IMAGE_REF" --platform linux/amd64 --target runner .
 
 echo "==> Pushing image to ACR..."
-az acr login --name "${ACR_LOGIN_SERVER%%.*}"
+az acr login --name "${ACR_LOGIN_SERVER%%.*}" --resource-group "$RESOURCE_GROUP"
 docker push "$IMAGE_REF"
 
 DEPLOYMENT_NAME="splitvibe-$ENV"
