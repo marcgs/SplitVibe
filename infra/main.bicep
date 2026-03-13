@@ -41,6 +41,9 @@ param appUrl string = ''
 @description('Custom domain hostname for the app (for example app.example.com). When set, AUTH_URL is derived as https://<customDomain>.')
 param customDomain string = ''
 
+@description('Set to true on the second deployment pass to bind the managed certificate to the custom domain')
+param domainCertReady bool = false
+
 @description('Container port (default 3000 for SplitVibe; use 80 for placeholder quickstart image)')
 param targetPort int = 3000
 
@@ -234,6 +237,7 @@ module containerApps 'modules/containerApps.bicep' = {
     managedIdentityClientId: managedIdentity.outputs.clientId
     targetPort: targetPort
     customDomain: customDomain
+    domainCertReady: domainCertReady
   }
 }
 

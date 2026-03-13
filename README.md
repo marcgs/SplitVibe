@@ -57,4 +57,17 @@ Required environment variables (set in `.env`):
 | `AUTH_GOOGLE_ID` | prod | |
 | `AUTH_GOOGLE_SECRET` | prod | |
 
+### Custom Domain & TLS
+
+When `CUSTOM_DOMAIN_PROD` (or `CUSTOM_DOMAIN_DEV`) is set, `bin/deploy` automatically binds the domain to the Container App with a managed TLS certificate. Azure requires a **two-phase deployment** for this:
+
+1. **Phase 1** — registers the hostname on the Container App with TLS disabled
+2. **Phase 2** — provisions the managed certificate (CNAME-validated) and upgrades the binding to SNI-enabled TLS
+
+Both phases run automatically within a single `bin/deploy` invocation. The first deployment with a new custom domain takes longer (~5–10 extra minutes) while Azure provisions the certificate. Subsequent deploys are idempotent and skip certificate provisioning.
+
+**Prerequisites:** DNS records (CNAME + TXT verification) must be configured before the first deploy. See [`infra/README.md`](infra/README.md) for details.
+
+---
+
 See [`docs/tech.md`](docs/tech.md) for the full architecture and [`infra/README.md`](infra/README.md) for infrastructure details.
