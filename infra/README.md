@@ -29,7 +29,7 @@ infra/
 - An active Azure subscription
 - Contributor + User Access Administrator (or Owner) role on the subscription
 
-## One-Time Bootstrap
+## Getting Started
 
 1. **Log in to Azure:**
 
@@ -38,54 +38,28 @@ infra/
    az account set --subscription <SUBSCRIPTION_ID>
    ```
 
-2. **Deploy the dev environment:**
-
-   The dev environment deploys with the Azure Container Apps placeholder image
-   (`mcr.microsoft.com/k8se/quickstart:latest`) listening on port 80.
-   Google OAuth parameters are optional for initial bootstrap. The checked-in
-   parameter files default to `northeurope`, which has been reliable for Azure
-   Container Apps capacity during validation; if you switch regions, keep the
-   deployment location and the `location` parameter aligned.
+2. **Configure environment variables** in `.env` (gitignored):
 
    ```bash
-   az deployment sub create \
-     --location northeurope \
-     --template-file infra/main.bicep \
-     --parameters infra/parameters/dev.parameters.json \
-     --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
-     --parameters nextAuthSecret='<RANDOM_SECRET>'
+   POSTGRES_ADMIN_PASSWORD='<STRONG_PASSWORD>'
+   NEXTAUTH_SECRET='<RANDOM_SECRET>'          # openssl rand -base64 32
+   CUSTOM_DOMAIN_PROD='app.example.com'       # required for prod
+   AUTH_GOOGLE_ID='<GOOGLE_CLIENT_ID>'
+   AUTH_GOOGLE_SECRET='<GOOGLE_CLIENT_SECRET>'
    ```
 
-   Generate a strong random secret with:
+3. **Provision infrastructure and deploy:**
 
    ```bash
-   openssl rand -base64 32
+   bin/infra dev           # provision dev Azure resources
+   bin/deploy dev          # build, push, and deploy to dev
+
+   bin/infra prod          # provision prod Azure resources
+   bin/deploy prod         # build, push, and deploy to prod
    ```
 
-3. **Deploy the prod environment:**
-
-   When deploying with the SplitVibe application image, supply the Google
-   OAuth credentials, custom domain, and the container image reference:
-
-   Keep `CUSTOM_DOMAIN` in your local `.env`/`.env.local` (gitignored), then
-   load it in your shell before deploying:
-
-   ```bash
-   set -a; source .env; set +a
-   ```
-
-   ```bash
-    az deployment sub create \
-      --location northeurope \
-      --template-file infra/main.bicep \
-      --parameters infra/parameters/prod.parameters.json \
-      --parameters postgresAdminPassword='<STRONG_PASSWORD>' \
-      --parameters nextAuthSecret='<RANDOM_SECRET>' \
-      --parameters customDomain="$CUSTOM_DOMAIN" \
-      --parameters authGoogleId='<GOOGLE_CLIENT_ID>' \
-      --parameters authGoogleSecret='<GOOGLE_CLIENT_SECRET>' \
-      --parameters containerImage='<ACR_LOGIN_SERVER>/splitvibe:<TAG>'
-   ```
+   The checked-in parameter files default to `northeurope`. If you switch
+   regions, keep the deployment location and the `location` parameter aligned.
 
 ## Parameters
 
@@ -139,6 +113,25 @@ account keys are passed to the Container App.
 - **Blob Storage** has `allowBlobPublicAccess: false` — accessible only via the Managed Identity (no account keys are injected).
 - **Key Vault** uses RBAC authorization; only the Container App's Managed Identity has `Secrets User` access.
 
+## Custom Domain & TLS
+
+Domain binding is handled imperatively by `bin/domain` (called automatically from `bin/deploy` when `customDomain` is set). This uses `az containerapp hostname` CLI commands instead of Bicep, avoiding the two-phase deployment that was previously needed.
+
+```bash
+bin/domain prod        # bind custom domain with managed TLS cert (idempotent)
+```
+
+The script adds the hostname, provisions a managed certificate (CNAME-validated), and binds it with SNI — all idempotently. If the domain is already bound with TLS, it skips.
+
+**DNS prerequisites** — before the first deploy with a custom domain, create these records on your DNS provider:
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | `<customDomain>` | Container App FQDN (e.g. `ca-splitvibe-prod.<hash>.northeurope.azurecontainerapps.io`) |
+| TXT | `asuid.<customDomain>` | Container Apps Environment custom domain verification ID |
+
+The first deployment with a new domain takes ~5–10 extra minutes while Azure provisions the certificate. Subsequent deploys are idempotent and skip certificate provisioning.
+
 ## Auth URL behavior
 
 `AUTH_URL` in the Container App is derived from deployment parameters:
@@ -151,25 +144,3 @@ For production environments with a bound custom domain, set `customDomain` (via 
 ## Re-running Deployments
 
 Bicep deployments are **idempotent**. Re-running the same command will update existing resources without creating duplicates.
-
-## CI/CD Integration
-
-In your GitHub Actions `deploy.yml` workflow, use the Azure CLI to deploy:
-
-```yaml
-- name: Deploy infrastructure
-  uses: azure/cli@v2
-  with:
-    inlineScript: |
-      az deployment sub create \
-        --location northeurope \
-        --template-file infra/main.bicep \
-        --parameters infra/parameters/prod.parameters.json \
-        --parameters postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
-        --parameters nextAuthSecret='${{ secrets.NEXTAUTH_SECRET }}' \
-        --parameters customDomain='${{ secrets.CUSTOM_DOMAIN }}' \
-        --parameters authGoogleId='${{ secrets.AUTH_GOOGLE_ID }}' \
-        --parameters authGoogleSecret='${{ secrets.AUTH_GOOGLE_SECRET }}' \
-        --parameters containerImage='${{ env.ACR_LOGIN_SERVER }}/splitvibe:${{ github.sha }}' \
-        --parameters targetPort=3000
-```

@@ -56,6 +56,7 @@ param targetPort int = 3000
 @description('Managed identity client ID for DefaultAzureCredential')
 param managedIdentityClientId string
 
+
 var hasGoogleAuthSecrets = !empty(authGoogleIdSecretUri) && !empty(authGoogleSecretSecretUri)
 var containerSecrets = concat([
   {

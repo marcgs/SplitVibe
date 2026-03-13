@@ -118,4 +118,4 @@ output storageAccountNameSecretUri string = secretStorageAccountName.properties.
 output authGoogleIdSecretUri string = !empty(authGoogleId) ? secretAuthGoogleId.properties.secretUri : ''
 
 @description('AUTH_GOOGLE_SECRET secret URI')
-output authGoogleSecretSecretUri string = !empty(authGoogleSecret) ? secretAuthGoogleSecret.properties.secretUri : ''
+output authGoogleSecretSecretUri string = !empty(authGoogleId) ? secretAuthGoogleSecret.properties.secretUri : ''
