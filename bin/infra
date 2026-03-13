@@ -29,10 +29,11 @@ missing=()
 [ -z "${POSTGRES_ADMIN_PASSWORD:-}" ] && missing+=("POSTGRES_ADMIN_PASSWORD")
 [ -z "${NEXTAUTH_SECRET:-}" ] && missing+=("NEXTAUTH_SECRET")
 
+[ -z "${AUTH_GOOGLE_ID:-}" ] && missing+=("AUTH_GOOGLE_ID")
+[ -z "${AUTH_GOOGLE_SECRET:-}" ] && missing+=("AUTH_GOOGLE_SECRET")
+
 if [ "$ENV" = "prod" ]; then
   [ -z "$CUSTOM_DOMAIN" ] && missing+=("CUSTOM_DOMAIN or CUSTOM_DOMAIN_PROD")
-  [ -z "${AUTH_GOOGLE_ID:-}" ] && missing+=("AUTH_GOOGLE_ID")
-  [ -z "${AUTH_GOOGLE_SECRET:-}" ] && missing+=("AUTH_GOOGLE_SECRET")
 fi
 
 if [ ${#missing[@]} -gt 0 ]; then
@@ -60,10 +61,8 @@ if [ -n "${CUSTOM_DOMAIN:-}" ]; then
   deploy_cmd+=(--parameters "customDomain=$CUSTOM_DOMAIN")
 fi
 
-if [ "$ENV" = "prod" ]; then
-  deploy_cmd+=(--parameters "authGoogleId=$AUTH_GOOGLE_ID")
-  deploy_cmd+=(--parameters "authGoogleSecret=$AUTH_GOOGLE_SECRET")
-fi
+deploy_cmd+=(--parameters "authGoogleId=$AUTH_GOOGLE_ID")
+deploy_cmd+=(--parameters "authGoogleSecret=$AUTH_GOOGLE_SECRET")
 
 "${deploy_cmd[@]}"
 
