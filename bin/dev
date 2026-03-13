@@ -4,6 +4,13 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
+# Inside a devcontainer, services and prisma are managed by
+# postStartCommand and bin/services — just start the dev server.
+if [ -n "${REMOTE_CONTAINERS:-}" ] || [ -n "${CODESPACES:-}" ] || [ -n "${REMOTE_CONTAINERS_IPC:-}" ]; then
+  echo "==> Devcontainer detected — starting Next.js dev server (ctrl+c to stop)..."
+  exec npm run dev
+fi
+
 cleanup() { echo "==> Stopping docker services..."; docker compose down; }
 trap cleanup EXIT
 trap 'exit 0' INT TERM
