@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+usage() {
+  echo "Usage: bin/services <up|down|restart|status>" >&2
+  exit 1
+}
+
+CMD="${1:-}"
+case "$CMD" in
+  up)      docker compose up -d db storage ;;
+  down)    docker compose stop db storage ;;
+  restart) docker compose restart db storage ;;
+  status)  docker compose ps db storage ;;
+  *)       usage ;;
+esac

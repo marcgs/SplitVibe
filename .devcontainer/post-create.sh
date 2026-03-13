@@ -10,5 +10,5 @@ npx playwright install --with-deps chromium
 echo ""
 echo "========================================="
 echo "  Dev container ready!"
-echo "  Run 'bin/dev' to start developing."
+echo "  Run 'npm run dev' to start the dev server."
 echo "========================================="
