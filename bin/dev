@@ -4,32 +4,6 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# Inside a devcontainer, services and prisma are managed by
-# postStartCommand and bin/services — just start the dev server.
-if [ -n "${REMOTE_CONTAINERS:-}" ] || [ -n "${CODESPACES:-}" ] || [ -n "${REMOTE_CONTAINERS_IPC:-}" ]; then
-  echo "==> Devcontainer detected — starting Next.js dev server (ctrl+c to stop)..."
-  exec npm run dev
-fi
-
-cleanup() { echo "==> Stopping docker services..."; docker compose down; }
-trap cleanup EXIT
-trap 'exit 0' INT TERM
-
-echo "==> Starting docker services (db + storage)..."
-docker compose up -d --force-recreate --remove-orphans
-
-echo "==> Waiting for database to be ready..."
-retries=0
-until docker compose exec -T db pg_isready -U postgres > /dev/null 2>&1; do
-  retries=$((retries + 1))
-  if [ "$retries" -ge 30 ]; then
-    echo "==> Error: database not ready after 30 retries" >&2
-    exit 1
-  fi
-  sleep 1
-done
-echo "==> Database is ready."
-
 echo "==> Generating Prisma client and running migrations..."
 npm run db:generate
 npm run db:migrate
