@@ -57,17 +57,7 @@ Required environment variables (set in `.env`):
 | `AUTH_GOOGLE_ID` | prod | |
 | `AUTH_GOOGLE_SECRET` | prod | |
 
-### Custom Domain & TLS
-
-When `CUSTOM_DOMAIN_PROD` (or `CUSTOM_DOMAIN_DEV`) is set, `bin/deploy` automatically calls `bin/domain` after the Bicep deployment to bind the domain with a managed TLS certificate. You can also run it standalone:
-
-```bash
-bin/domain prod        # bind custom domain with managed TLS cert (idempotent)
-```
-
-The script is idempotent — if the domain is already bound with TLS, it skips. The first run takes ~5–10 minutes while Azure provisions the certificate.
-
-**Prerequisites:** DNS records (CNAME + TXT verification) must be configured before the first deploy. See [`infra/README.md`](infra/README.md) for details.
+For custom domain and TLS setup, see [`infra/README.md`](infra/README.md).
 
 ---
 
