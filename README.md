@@ -40,8 +40,10 @@ bin/check              # full CI gate (typecheck + lint + tests)
 Deploys to **Azure Container Apps** via GitHub Actions on push to `main`.
 
 ```bash
-bin/deploy dev         # deploy to dev environment
-bin/deploy prod        # deploy to production
+bin/infra dev          # provision Azure infrastructure (first time)
+bin/infra prod         # provision prod infrastructure
+bin/deploy dev         # build, push, and deploy app to dev
+bin/deploy prod        # build, push, and deploy app to prod
 ```
 
 Required environment variables (set in `.env`):

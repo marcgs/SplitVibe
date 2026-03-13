@@ -6,7 +6,7 @@ cd "$PROJECT_ROOT"
 
 ENV="${1:-}"
 if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
-  echo "Usage: bin/deploy <dev|prod>" >&2
+  echo "Usage: bin/infra <dev|prod>" >&2
   exit 1
 fi
 
@@ -38,37 +38,9 @@ if [ ${#missing[@]} -gt 0 ]; then
   exit 1
 fi
 
-RESOURCE_GROUP="rg-splitvibe-$ENV"
-
-# Discover ACR login server
-echo "==> Discovering ACR in $RESOURCE_GROUP..."
-if ! az group show --name "$RESOURCE_GROUP" > /dev/null 2>&1; then
-  echo "==> Error: resource group $RESOURCE_GROUP not found." >&2
-  echo "    Run 'bin/infra $ENV' first to provision infrastructure." >&2
-  exit 1
-fi
-ACR_LOGIN_SERVER=$(az acr list --resource-group "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
-if [ -z "$ACR_LOGIN_SERVER" ]; then
-  echo "==> Error: no ACR found in $RESOURCE_GROUP." >&2
-  echo "    Run 'bin/infra $ENV' first to provision infrastructure." >&2
-  exit 1
-fi
-
-# Image tag from git or timestamp fallback
-IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || date +%s)
-IMAGE_REF="$ACR_LOGIN_SERVER/splitvibe:$IMAGE_TAG"
-
-echo "==> Building image: $IMAGE_REF"
-docker build -t "$IMAGE_REF" --target runner .
-
-echo "==> Pushing image to ACR..."
-az acr login --name "${ACR_LOGIN_SERVER%%.*}"
-docker push "$IMAGE_REF"
-
 DEPLOYMENT_NAME="splitvibe-$ENV"
 
-# Build deployment command
-echo "==> Deploying to $ENV..."
+echo "==> Deploying infrastructure for $ENV..."
 deploy_cmd=(
   az deployment sub create
   --name "$DEPLOYMENT_NAME"
@@ -77,8 +49,6 @@ deploy_cmd=(
   --parameters "infra/parameters/$ENV.parameters.json"
   --parameters "postgresAdminPassword=$POSTGRES_ADMIN_PASSWORD"
   --parameters "nextAuthSecret=$NEXTAUTH_SECRET"
-  --parameters "containerImage=$IMAGE_REF"
-  --parameters "targetPort=3000"
 )
 
 if [ "$ENV" = "prod" ]; then
@@ -89,13 +59,18 @@ fi
 
 "${deploy_cmd[@]}"
 
-# Print summary
-APP_URL=$(az deployment sub show \
-  --name "$DEPLOYMENT_NAME" \
+# Print summary from deployment outputs
+RG=$(az deployment sub show --name "$DEPLOYMENT_NAME" \
+  --query "properties.outputs.resourceGroupName.value" -o tsv 2>/dev/null || echo "unknown")
+ACR=$(az deployment sub show --name "$DEPLOYMENT_NAME" \
+  --query "properties.outputs.acrLoginServer.value" -o tsv 2>/dev/null || echo "unknown")
+APP_URL=$(az deployment sub show --name "$DEPLOYMENT_NAME" \
   --query "properties.outputs.containerAppUrl.value" -o tsv 2>/dev/null || echo "unknown")
 
 echo ""
-echo "==> Deployment complete."
-echo "    Resource group: $RESOURCE_GROUP"
-echo "    Image:          $IMAGE_REF"
+echo "==> Infrastructure deployed."
+echo "    Resource group: $RG"
+echo "    ACR:            $ACR"
 echo "    App URL:        $APP_URL"
+echo ""
+echo "Next step: bin/deploy $ENV"
