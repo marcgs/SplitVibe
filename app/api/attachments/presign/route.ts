@@ -93,7 +93,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { uploadUrl, blobName } = await generateUploadSasUrl(fileName, contentType);
-
-  return NextResponse.json({ uploadUrl, blobName });
+  try {
+    const { uploadUrl, blobName } = await generateUploadSasUrl(fileName, contentType);
+    return NextResponse.json({ uploadUrl, blobName });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown storage error";
+    console.error("Presign error:", message);
+    return NextResponse.json({ error: "Storage error", details: message }, { status: 500 });
+  }
 }
