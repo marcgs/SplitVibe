@@ -30,9 +30,8 @@ Shared-expense tracking PWA. Users create groups, add expenses (with flexible sp
 **Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** If a workflow isn't covered, suggest extending the harness with a new subcommand. Run `bin/sv docs <topic>` to read project documentation.
 
 ```bash
-bin/sv dev                            # Start dev environment (docker + db + Next.js)
-bin/sv env-up                         # Start backend services (docker + db + migrations)
-bin/sv env-down                       # Tear down backend services and kill port 3000
+bin/sv up                             # Start backend services (docker + db + migrations)
+bin/sv down                           # Tear down backend services and kill port 3000
 bin/sv serve                          # Start Next.js dev server only
 bin/sv test [args]                    # Run tests (--e2e, --watch, path)
 bin/sv test path/to/test.ts           # Single test file

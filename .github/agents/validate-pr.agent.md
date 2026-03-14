@@ -77,9 +77,9 @@ Always start from a **clean slate** to avoid stale state, old code, or
 leftover data from previous runs.
 
 1. **Tear down anything already running:**
-   - `bin/sv env-down` — kill port 3000, stop containers, remove volumes.
+   - `bin/sv down` — kill port 3000, stop containers, remove volumes.
 2. **Start backend services + apply migrations:**
-   - `bin/sv env-up` — start Postgres & Azurite, wait for DB ready,
+   - `bin/sv up` — start Postgres & Azurite, wait for DB ready,
      generate Prisma client, run migrations.
 3. **Start the Next.js dev server** (async/detached so it keeps running):
    - `bin/sv serve`
@@ -159,7 +159,7 @@ step 6.
 
 After posting results, **always** clean up:
 
-1. `bin/sv env-down` — kill dev server, stop containers, remove volumes.
+1. `bin/sv down` — kill dev server, stop containers, remove volumes.
 2. `cd` back to the original repository root.
 3. `git worktree remove ../splitvibe-validate --force` — remove the
    temporary worktree.

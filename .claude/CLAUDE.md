@@ -30,9 +30,8 @@ SplitVibe is a shared-expense tracking Progressive Web App (PWA). Users create g
 Use `bin/sv` as the primary interface for all project commands.
 
 ```bash
-bin/sv dev                            # Start dev environment (docker + db + Next.js)
-bin/sv env-up                         # Start backend services (docker + db + migrations)
-bin/sv env-down                       # Tear down backend services and kill port 3000
+bin/sv up                             # Start backend services (docker + db + migrations)
+bin/sv down                           # Tear down backend services and kill port 3000
 bin/sv serve                          # Start Next.js dev server only
 bin/sv test [args]                    # Run tests (--e2e, --watch, path)
 bin/sv test path/to/test.ts           # Run a single test file
