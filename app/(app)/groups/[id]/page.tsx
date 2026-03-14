@@ -8,6 +8,7 @@ import InviteLinkSection from "./invite-link-section";
 import ExpenseForm from "./expense-form";
 import SettlementForm from "./settlement-form";
 import DeleteSettlementButton from "./delete-settlement-button";
+import ExpenseAttachments from "./expense-attachments";
 
 export default async function GroupDetailPage({
   params,
@@ -36,6 +37,10 @@ export default async function GroupDetailPage({
           },
           splits: {
             include: { user: { select: { id: true, name: true, email: true } } },
+          },
+          attachments: {
+            select: { id: true, fileName: true, contentType: true },
+            orderBy: { uploadedAt: "asc" },
           },
         },
         orderBy: { date: "desc" },
@@ -213,19 +218,25 @@ export default async function GroupDetailPage({
               {group.expenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
+                  className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
                 >
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{expense.description}</div>
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                      Paid by{" "}
-                      {expense.payers[0]?.user.name ?? expense.payers[0]?.user.email ?? "Unknown"}{" "}
-                      · {new Date(expense.date).toLocaleDateString()}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{expense.description}</div>
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Paid by{" "}
+                        {expense.payers[0]?.user.name ?? expense.payers[0]?.user.email ?? "Unknown"}{" "}
+                        · {new Date(expense.date).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold">
+                      ${Number(expense.amount).toFixed(2)}
                     </div>
                   </div>
-                  <div className="text-sm font-semibold">
-                    ${Number(expense.amount).toFixed(2)}
-                  </div>
+                  <ExpenseAttachments
+                    expenseId={expense.id}
+                    attachments={expense.attachments}
+                  />
                 </div>
               ))}
             </div>

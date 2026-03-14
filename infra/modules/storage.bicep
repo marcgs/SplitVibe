@@ -7,6 +7,9 @@ param storageAccountName string
 @description('Blob container name for attachments')
 param containerName string = 'attachments'
 
+@description('Allowed CORS origin for browser uploads (app URL)')
+param corsOrigin string = ''
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
@@ -25,6 +28,19 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
   parent: storageAccount
   name: 'default'
+  properties: {
+    cors: {
+      corsRules: empty(corsOrigin) ? [] : [
+        {
+          allowedOrigins: [corsOrigin]
+          allowedMethods: ['GET', 'PUT']
+          allowedHeaders: ['*']
+          exposedHeaders: ['*']
+          maxAgeInSeconds: 3600
+        }
+      ]
+    }
+  }
 }
 
 resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
