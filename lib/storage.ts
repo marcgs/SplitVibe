@@ -5,7 +5,7 @@ import {
   BlobSASPermissions,
   SASProtocol,
 } from "@azure/storage-blob";
-import { DefaultAzureCredential } from "@azure/identity";
+import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
 import { randomUUID } from "crypto";
 
 function isAzurite(): boolean {
@@ -27,7 +27,10 @@ function getBlobServiceClient(): BlobServiceClient {
     );
   }
   const accountName = getAccountName();
-  const credential = new DefaultAzureCredential();
+  const clientId = process.env.AZURE_CLIENT_ID;
+  const credential = clientId
+    ? new ManagedIdentityCredential(clientId)
+    : new DefaultAzureCredential();
   return new BlobServiceClient(
     `https://${accountName}.blob.core.windows.net`,
     credential

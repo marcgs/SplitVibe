@@ -35,6 +35,7 @@ vi.mock("@azure/storage-blob", () => ({
 
 vi.mock("@azure/identity", () => ({
   DefaultAzureCredential: vi.fn(),
+  ManagedIdentityCredential: vi.fn(),
 }));
 
 // ---------- tests --------------------------------------------------------
