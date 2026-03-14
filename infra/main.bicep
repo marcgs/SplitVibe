@@ -198,6 +198,17 @@ module storageBlobRole 'modules/roleAssignment.bicep' = {
   }
 }
 
+// Storage Blob Delegator — allow the Container App to generate user delegation keys
+module storageBlobDelegatorRole 'modules/roleAssignment.bicep' = {
+  name: 'storageBlobDelegatorRole'
+  scope: rg
+  params: {
+    principalId: managedIdentity.outputs.principalId
+    roleDefinitionId: 'db58b8e5-c6ad-4a2a-8342-4190687cbf4a'
+    targetResourceId: storage.outputs.id
+  }
+}
+
 // Key Vault Secrets User — allow the Container App to read secrets
 module keyVaultSecretsRole 'modules/roleAssignment.bicep' = {
   name: 'keyVaultSecretsRole'
@@ -215,7 +226,7 @@ module keyVaultSecretsRole 'modules/roleAssignment.bicep' = {
 module containerApps 'modules/containerApps.bicep' = {
   name: 'containerApps'
   scope: rg
-  dependsOn: [acrPullRole, storageBlobRole, keyVaultSecretsRole]
+  dependsOn: [acrPullRole, storageBlobRole, storageBlobDelegatorRole, keyVaultSecretsRole]
   params: {
     location: location
     environment: environment
