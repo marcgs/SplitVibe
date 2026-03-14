@@ -5,7 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 import { mockUsers } from "@/lib/mock-users";
 
-const isDev = process.env.NODE_ENV === "development";
+const isDev = process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === "true";
 
 const mockProvider = Credentials({
   name: "Mock User",

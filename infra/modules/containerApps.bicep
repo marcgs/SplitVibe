@@ -117,6 +117,10 @@ var containerEnv = concat([
     value: 'production'
   }
   {
+    name: 'NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS'
+    value: environment == 'dev' ? 'true' : 'false'
+  }
+  {
     name: 'PORT'
     value: '3000'
   }

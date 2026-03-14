@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { mockUsers } from "@/lib/mock-users";
 
-const isDev = process.env.NODE_ENV === "development";
+const isDev = process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === "true";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);

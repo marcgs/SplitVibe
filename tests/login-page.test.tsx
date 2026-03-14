@@ -10,7 +10,7 @@ vi.mock("next-auth/react", () => ({
 
 describe("Login page", () => {
   it("should show Google sign-in and hide mock login in production", async () => {
-    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS", "false");
     vi.resetModules();
 
     const { default: LoginPage } = await import("@/app/(auth)/login/page");
@@ -23,7 +23,7 @@ describe("Login page", () => {
   });
 
   it("should keep mock login available in development", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS", "true");
     vi.resetModules();
 
     const { default: LoginPage } = await import("@/app/(auth)/login/page");
@@ -36,7 +36,7 @@ describe("Login page", () => {
   });
 
   it("should start Google sign-in with the dashboard callback", async () => {
-    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS", "false");
     vi.resetModules();
     const user = userEvent.setup();
 
