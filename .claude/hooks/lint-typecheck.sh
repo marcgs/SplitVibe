@@ -20,12 +20,7 @@ fi
 
 echo "🔍 Lint/type-check: $FILE"
 
-# Type-check the whole project
-echo "→ tsc --noEmit"
-npx tsc --noEmit
-
-# Lint the specific file
-echo "→ eslint $FILE"
-npx eslint "$FILE"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+"$PROJECT_ROOT/bin/sv" lint "$FILE"
 
 echo "✅ Passed"

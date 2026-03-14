@@ -25,23 +25,22 @@ Shared-expense tracking PWA. Users create groups, add expenses (with flexible sp
 
 ---
 
-## Commands
+## CLI — `bin/sv`
+
+**Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** If a workflow isn't covered, suggest extending the harness with a new subcommand. Run `bin/sv docs <topic>` to read project documentation.
 
 ```bash
-# Dev environment
-docker compose up                     # Start postgres + azurite
-npm run dev                           # Next.js dev server (port 3000)
-npm run db:migrate                    # Run Prisma migrations
-npm run db:generate                   # Regenerate Prisma client
-
-# Quality (run before pushing)
-npm run typecheck                     # TypeScript type-check
-npm run lint                          # ESLint
-npm test                              # Vitest unit/integration tests
-npm run build                         # Production build smoke-check
-
-# Testing
-npx vitest run path/to/test.ts        # Single test file
-npx vitest run -t "test name"         # Tests matching a pattern
-npm run test:e2e                      # Playwright e2e tests
+bin/sv up                             # Start backend services (docker + db + migrations)
+bin/sv down                           # Tear down backend services and kill port 3000
+bin/sv serve                          # Start Next.js dev server only
+bin/sv test [args]                    # Run tests (--e2e, --watch, path)
+bin/sv test path/to/test.ts           # Single test file
+bin/sv check                          # Full quality gate (typecheck + lint + test)
+bin/sv lint                           # Typecheck + lint (project-wide)
+bin/sv lint path/to/file.ts           # Typecheck + lint single file
+bin/sv deploy <dev|prod>              # Build, push, deploy
+bin/sv infra <dev|prod>               # Provision Azure infrastructure
+bin/sv domain <dev|prod>              # Bind custom domain + TLS
+bin/sv docs                           # List available doc topics
+bin/sv docs <topic>                   # Print doc content to stdout
 ```

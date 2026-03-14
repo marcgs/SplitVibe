@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
+ENV="${1:-}"
+if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
+  echo "Usage: bin/sv deploy <dev|prod>" >&2
+  exit 1
+fi
+
+# Source .env if present
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+# Resolve per-environment CUSTOM_DOMAIN (CUSTOM_DOMAIN_DEV / CUSTOM_DOMAIN_PROD override CUSTOM_DOMAIN)
+ENV_UPPER=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
+ENV_DOMAIN_VAR="CUSTOM_DOMAIN_$ENV_UPPER"
+CUSTOM_DOMAIN="${!ENV_DOMAIN_VAR:-${CUSTOM_DOMAIN:-}}"
+
+# Validate required env vars
+missing=()
+
+[ -z "${POSTGRES_ADMIN_PASSWORD:-}" ] && missing+=("POSTGRES_ADMIN_PASSWORD")
+[ -z "${NEXTAUTH_SECRET:-}" ] && missing+=("NEXTAUTH_SECRET")
+
+[ -z "${AUTH_GOOGLE_ID:-}" ] && missing+=("AUTH_GOOGLE_ID")
+[ -z "${AUTH_GOOGLE_SECRET:-}" ] && missing+=("AUTH_GOOGLE_SECRET")
+
+if [ "$ENV" = "prod" ]; then
+  [ -z "$CUSTOM_DOMAIN" ] && missing+=("CUSTOM_DOMAIN or CUSTOM_DOMAIN_PROD")
+fi
+
+if [ ${#missing[@]} -gt 0 ]; then
+  echo "==> Error: missing required environment variables:" >&2
+  for var in "${missing[@]}"; do
+    echo "    - $var" >&2
+  done
+  exit 1
+fi
+
+RESOURCE_GROUP="rg-splitvibe-$ENV"
+
+# Discover ACR login server
+echo "==> Discovering ACR in $RESOURCE_GROUP..."
+if ! az group show --name "$RESOURCE_GROUP" > /dev/null 2>&1; then
+  echo "==> Error: resource group $RESOURCE_GROUP not found." >&2
+  echo "    Run 'bin/sv infra $ENV' first to provision infrastructure." >&2
+  exit 1
+fi
+ACR_LOGIN_SERVER=$(az acr list --resource-group "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
+if [ -z "$ACR_LOGIN_SERVER" ]; then
+  echo "==> Error: no ACR found in $RESOURCE_GROUP." >&2
+  echo "    Run 'bin/sv infra $ENV' first to provision infrastructure." >&2
+  exit 1
+fi
+
+# Image tag from git or timestamp fallback
+IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || date +%s)
+IMAGE_REF="$ACR_LOGIN_SERVER/splitvibe:$IMAGE_TAG"
+
+echo "==> Building image: $IMAGE_REF"
+docker build -t "$IMAGE_REF" --platform linux/amd64 --target runner .
+
+echo "==> Pushing image to ACR..."
+az acr login --name "${ACR_LOGIN_SERVER%%.*}" --resource-group "$RESOURCE_GROUP"
+docker push "$IMAGE_REF"
+
+DEPLOYMENT_NAME="splitvibe-$ENV"
+
+# Build deployment command
+echo "==> Deploying to $ENV..."
+deploy_cmd=(
+  az deployment sub create
+  --name "$DEPLOYMENT_NAME"
+  --location northeurope
+  --template-file infra/main.bicep
+  --parameters "infra/parameters/$ENV.parameters.json"
+  --parameters "postgresAdminPassword=$POSTGRES_ADMIN_PASSWORD"
+  --parameters "nextAuthSecret=$NEXTAUTH_SECRET"
+  --parameters "containerImage=$IMAGE_REF"
+  --parameters "targetPort=3000"
+)
+
+if [ -n "${CUSTOM_DOMAIN:-}" ]; then
+  deploy_cmd+=(--parameters "customDomain=$CUSTOM_DOMAIN")
+fi
+
+deploy_cmd+=(--parameters "authGoogleId=$AUTH_GOOGLE_ID")
+deploy_cmd+=(--parameters "authGoogleSecret=$AUTH_GOOGLE_SECRET")
+
+"${deploy_cmd[@]}"
+
+# Bind custom domain with managed TLS certificate (idempotent)
+if [ -n "${CUSTOM_DOMAIN:-}" ]; then
+  bin/sv domain "$ENV"
+fi
+
+# Print summary
+APP_URL=$(az deployment sub show \
+  --name "$DEPLOYMENT_NAME" \
+  --query "properties.outputs.containerAppUrl.value" -o tsv 2>/dev/null || echo "unknown")
+
+echo ""
+echo "==> Deployment complete."
+echo "    Resource group: $RESOURCE_GROUP"
+echo "    Image:          $IMAGE_REF"
+echo "    App URL:        $APP_URL"

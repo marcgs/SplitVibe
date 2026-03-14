@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
+ENV="${1:-}"
+if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
+  echo "Usage: bin/sv infra <dev|prod>" >&2
+  exit 1
+fi
+
+# Source .env if present
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+# Resolve per-environment CUSTOM_DOMAIN (CUSTOM_DOMAIN_DEV / CUSTOM_DOMAIN_PROD override CUSTOM_DOMAIN)
+ENV_UPPER=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
+ENV_DOMAIN_VAR="CUSTOM_DOMAIN_$ENV_UPPER"
+CUSTOM_DOMAIN="${!ENV_DOMAIN_VAR:-${CUSTOM_DOMAIN:-}}"
+
+# Validate required env vars
+missing=()
+
+[ -z "${POSTGRES_ADMIN_PASSWORD:-}" ] && missing+=("POSTGRES_ADMIN_PASSWORD")
+[ -z "${NEXTAUTH_SECRET:-}" ] && missing+=("NEXTAUTH_SECRET")
+
+[ -z "${AUTH_GOOGLE_ID:-}" ] && missing+=("AUTH_GOOGLE_ID")
+[ -z "${AUTH_GOOGLE_SECRET:-}" ] && missing+=("AUTH_GOOGLE_SECRET")
+
+if [ "$ENV" = "prod" ]; then
+  [ -z "$CUSTOM_DOMAIN" ] && missing+=("CUSTOM_DOMAIN or CUSTOM_DOMAIN_PROD")
+fi
+
+if [ ${#missing[@]} -gt 0 ]; then
+  echo "==> Error: missing required environment variables:" >&2
+  for var in "${missing[@]}"; do
+    echo "    - $var" >&2
+  done
+  exit 1
+fi
+
+DEPLOYMENT_NAME="splitvibe-$ENV"
+
+echo "==> Deploying infrastructure for $ENV..."
+deploy_cmd=(
+  az deployment sub create
+  --name "$DEPLOYMENT_NAME"
+  --location northeurope
+  --template-file infra/main.bicep
+  --parameters "infra/parameters/$ENV.parameters.json"
+  --parameters "postgresAdminPassword=$POSTGRES_ADMIN_PASSWORD"
+  --parameters "nextAuthSecret=$NEXTAUTH_SECRET"
+)
+
+if [ -n "${CUSTOM_DOMAIN:-}" ]; then
+  deploy_cmd+=(--parameters "customDomain=$CUSTOM_DOMAIN")
+fi
+
+deploy_cmd+=(--parameters "authGoogleId=$AUTH_GOOGLE_ID")
+deploy_cmd+=(--parameters "authGoogleSecret=$AUTH_GOOGLE_SECRET")
+
+"${deploy_cmd[@]}"
+
+# Print summary from deployment outputs
+RG=$(az deployment sub show --name "$DEPLOYMENT_NAME" \
+  --query "properties.outputs.resourceGroupName.value" -o tsv 2>/dev/null || echo "unknown")
+ACR=$(az deployment sub show --name "$DEPLOYMENT_NAME" \
+  --query "properties.outputs.acrLoginServer.value" -o tsv 2>/dev/null || echo "unknown")
+APP_URL=$(az deployment sub show --name "$DEPLOYMENT_NAME" \
+  --query "properties.outputs.containerAppUrl.value" -o tsv 2>/dev/null || echo "unknown")
+
+echo ""
+echo "==> Infrastructure deployed."
+echo "    Resource group: $RG"
+echo "    ACR:            $ACR"
+echo "    App URL:        $APP_URL"
+echo ""
+echo "Next step: bin/sv deploy $ENV"
