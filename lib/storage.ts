@@ -5,19 +5,33 @@ import {
   BlobSASPermissions,
   SASProtocol,
 } from "@azure/storage-blob";
+import { DefaultAzureCredential } from "@azure/identity";
 import { randomUUID } from "crypto";
 
-function getCredential(): StorageSharedKeyCredential {
-  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME ?? "";
-  const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY ?? "";
-  return new StorageSharedKeyCredential(accountName, accountKey);
+function isAzurite(): boolean {
+  return !!process.env.AZURE_STORAGE_CONNECTION_STRING;
 }
 
-function getContainerClient() {
-  const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING ?? "";
-  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME ?? "splitvibe-attachments";
-  const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-  return blobServiceClient.getContainerClient(containerName);
+function getAccountName(): string {
+  return process.env.AZURE_STORAGE_ACCOUNT_NAME ?? "";
+}
+
+function getContainerName(): string {
+  return process.env.AZURE_STORAGE_CONTAINER_NAME ?? "splitvibe-attachments";
+}
+
+function getBlobServiceClient(): BlobServiceClient {
+  if (isAzurite()) {
+    return BlobServiceClient.fromConnectionString(
+      process.env.AZURE_STORAGE_CONNECTION_STRING!
+    );
+  }
+  const accountName = getAccountName();
+  const credential = new DefaultAzureCredential();
+  return new BlobServiceClient(
+    `https://${accountName}.blob.core.windows.net`,
+    credential
+  );
 }
 
 function getReadTtlMinutes(): number {
@@ -29,6 +43,53 @@ function getReadTtlMinutes(): number {
   return 15;
 }
 
+async function generateSasToken(
+  blobName: string,
+  permissions: string,
+  expiresOn: Date,
+  contentType?: string
+): Promise<string> {
+  const containerName = getContainerName();
+  const startsOn = new Date();
+
+  if (isAzurite()) {
+    const accountName = getAccountName();
+    const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY ?? "";
+    const credential = new StorageSharedKeyCredential(accountName, accountKey);
+    return generateBlobSASQueryParameters(
+      {
+        containerName,
+        blobName,
+        permissions: BlobSASPermissions.parse(permissions),
+        startsOn,
+        expiresOn,
+        contentType,
+        protocol: SASProtocol.HttpsAndHttp,
+      },
+      credential
+    ).toString();
+  }
+
+  const blobServiceClient = getBlobServiceClient();
+  const delegationKey = await blobServiceClient.getUserDelegationKey(
+    startsOn,
+    expiresOn
+  );
+  return generateBlobSASQueryParameters(
+    {
+      containerName,
+      blobName,
+      permissions: BlobSASPermissions.parse(permissions),
+      startsOn,
+      expiresOn,
+      contentType,
+      protocol: SASProtocol.Https,
+    },
+    delegationKey,
+    getAccountName()
+  ).toString();
+}
+
 export async function generateUploadSasUrl(
   originalFileName: string,
   contentType: string
@@ -36,25 +97,12 @@ export async function generateUploadSasUrl(
   const ext = originalFileName.split(".").pop() ?? "";
   const blobName = `${randomUUID()}.${ext}`;
 
-  const containerClient = getContainerClient();
+  const blobServiceClient = getBlobServiceClient();
+  const containerClient = blobServiceClient.getContainerClient(getContainerName());
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-  const credential = getCredential();
-  const startsOn = new Date();
-  const expiresOn = new Date(startsOn.getTime() + 10 * 60 * 1000); // 10 min upload window
-
-  const sasToken = generateBlobSASQueryParameters(
-    {
-      containerName: process.env.AZURE_STORAGE_CONTAINER_NAME ?? "splitvibe-attachments",
-      blobName,
-      permissions: BlobSASPermissions.parse("cw"),
-      startsOn,
-      expiresOn,
-      contentType,
-      protocol: SASProtocol.HttpsAndHttp,
-    },
-    credential
-  ).toString();
+  const expiresOn = new Date(Date.now() + 10 * 60 * 1000);
+  const sasToken = await generateSasToken(blobName, "cw", expiresOn, contentType);
 
   return {
     uploadUrl: `${blockBlobClient.url}?${sasToken}`,
@@ -63,25 +111,13 @@ export async function generateUploadSasUrl(
 }
 
 export async function generateReadSasUrl(blobName: string): Promise<string> {
-  const containerClient = getContainerClient();
+  const blobServiceClient = getBlobServiceClient();
+  const containerClient = blobServiceClient.getContainerClient(getContainerName());
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-  const credential = getCredential();
-  const startsOn = new Date();
   const ttlMinutes = getReadTtlMinutes();
-  const expiresOn = new Date(startsOn.getTime() + ttlMinutes * 60 * 1000);
-
-  const sasToken = generateBlobSASQueryParameters(
-    {
-      containerName: process.env.AZURE_STORAGE_CONTAINER_NAME ?? "splitvibe-attachments",
-      blobName,
-      permissions: BlobSASPermissions.parse("r"),
-      startsOn,
-      expiresOn,
-      protocol: SASProtocol.HttpsAndHttp,
-    },
-    credential
-  ).toString();
+  const expiresOn = new Date(Date.now() + ttlMinutes * 60 * 1000);
+  const sasToken = await generateSasToken(blobName, "r", expiresOn);
 
   return `${blockBlobClient.url}?${sasToken}`;
 }

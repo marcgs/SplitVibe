@@ -147,6 +147,7 @@ module storage 'modules/storage.bicep' = {
   params: {
     location: location
     storageAccountName: storageAccountName
+    corsOrigin: effectiveAppUrl
   }
 }
 

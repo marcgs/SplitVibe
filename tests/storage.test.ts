@@ -14,6 +14,15 @@ vi.mock("@azure/storage-blob", () => ({
           url: "http://storage:10000/devstoreaccount1/splitvibe-attachments/test-blob",
         }),
       }),
+      getUserDelegationKey: vi.fn().mockResolvedValue({
+        signedObjectId: "fake-oid",
+        signedTenantId: "fake-tid",
+        signedStartsOn: new Date(),
+        signedExpiresOn: new Date(),
+        signedService: "b",
+        signedVersion: "2024-01-01",
+        value: "fake-key",
+      }),
     }),
   },
   generateBlobSASQueryParameters: mockGenerateBlobSASQueryParameters,
@@ -22,6 +31,10 @@ vi.mock("@azure/storage-blob", () => ({
     parse: vi.fn().mockReturnValue({}),
   },
   SASProtocol: { Https: "https", HttpsAndHttp: "https,http" },
+}));
+
+vi.mock("@azure/identity", () => ({
+  DefaultAzureCredential: vi.fn(),
 }));
 
 // ---------- tests --------------------------------------------------------
@@ -57,7 +70,6 @@ describe("storage client", () => {
     const url = await generateReadSasUrl("test-blob.jpg");
 
     expect(url).toBeDefined();
-    // TTL is passed to SAS generation internally — we verify it was called
     expect(mockGenerateBlobSASQueryParameters).toHaveBeenCalled();
   });
 
