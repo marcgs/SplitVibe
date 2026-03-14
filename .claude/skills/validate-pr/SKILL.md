@@ -14,6 +14,10 @@ Validate the acceptance criteria of the given PR.
 
 A pull request number or URL from the **marcgs/SplitVibe** repository.
 
+## CLI
+
+Use `bin/sv` as the primary interface for project commands. Run `bin/sv docs tech` for architecture and setup details. Note: validate-pr uses its own worktree-based dev setup (see Step 4), not `bin/sv dev`.
+
 ## Steps
 
 ### 1. Resolve the PR and linked GitHub issue
