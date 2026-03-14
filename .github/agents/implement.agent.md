@@ -14,6 +14,10 @@ Implement a GitHub issue, open a PR, and validate it.
 
 A GitHub issue number or URL from the **marcgs/SplitVibe** repository.
 
+## CLI
+
+**Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** If a workflow isn't covered, suggest extending the harness with a new subcommand. Run `bin/sv --help` for available commands and `bin/sv docs <topic>` to read project documentation.
+
 ## Steps
 
 ### 1. Read and understand the issue
@@ -70,7 +74,7 @@ For each logical unit of work:
    - E2E tests go in `tests/e2e/` using Playwright.
 2. **Run the test** to confirm it fails:
    ```bash
-   npx vitest run <path/to/test.ts>
+   bin/sv test <path/to/test.ts>
    ```
 3. **Implement the minimal code** to make the test pass.
 4. **Run the test again** to confirm it passes.
@@ -96,9 +100,7 @@ For each logical unit of work:
 After all implementation is complete, run the full quality suite:
 
 ```bash
-npm run typecheck          # Must pass with zero errors
-npm run lint               # Must pass with zero errors
-npm test                   # All unit/integration tests must pass
+bin/sv check               # Typecheck + lint + all tests
 ```
 
 Fix any issues before proceeding. Do not skip this step.

@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT"
-
-cleanup() { echo "==> Stopping docker services..."; docker compose down; }
-trap cleanup EXIT
-trap 'exit 0' INT TERM
 
 echo "==> Starting docker services (db + storage)..."
 docker compose up -d --force-recreate --remove-orphans
@@ -27,5 +23,4 @@ echo "==> Generating Prisma client and running migrations..."
 npm run db:generate
 npm run db:migrate
 
-echo "==> Starting Next.js dev server (ctrl+c to stop)..."
-npm run dev
+echo "==> Backend services are up."

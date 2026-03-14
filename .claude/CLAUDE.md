@@ -25,37 +25,28 @@ SplitVibe is a shared-expense tracking Progressive Web App (PWA). Users create g
 
 ---
 
-## Commands
+## Commands — `bin/sv`
 
-### Development
-```bash
-docker compose up          # Start backend services (postgres + azurite)
-docker compose --profile full up  # Start everything including the app
-npm run dev                # Start Next.js dev server (port 3000)
-npm run build              # Production build (smoke-check)
-npm run db:migrate         # Run Prisma migrations
-npm run db:studio          # Open Prisma Studio
-npm run db:generate        # Regenerate Prisma client
-```
+Use `bin/sv` as the primary interface for all project commands.
 
-### Testing
 ```bash
-npm test                              # Run Vitest unit/integration tests (once)
-npm run test:watch                    # Run Vitest in watch mode
-npx vitest run path/to/test.ts        # Run a single test file
-npx vitest run -t "test name pattern" # Run tests matching a name
-npm run test:e2e                      # Run Playwright e2e tests
-npm run test:e2e:ui                   # Open Playwright UI mode
+bin/sv up                             # Start backend services (docker + db + migrations)
+bin/sv down                           # Tear down backend services and kill port 3000
+bin/sv serve                          # Start Next.js dev server only
+bin/sv test [args]                    # Run tests (--e2e, --watch, path)
+bin/sv test path/to/test.ts           # Run a single test file
+bin/sv check                          # Full quality gate (typecheck -> lint -> test)
+bin/sv lint                           # Typecheck + lint (project-wide)
+bin/sv lint path/to/file.ts           # Typecheck + lint single file
+bin/sv deploy <dev|prod>              # Build, push, deploy
+bin/sv infra <dev|prod>               # Provision Azure infrastructure
+bin/sv domain <dev|prod>              # Bind custom domain + TLS
+bin/sv docs                           # List available doc topics
+bin/sv docs <topic>                   # Print doc content to stdout
 /e2e                                  # Claude-driven Playwright feature validation
 ```
 
-### Quality
-```bash
-npm run typecheck          # TypeScript type-check (no emit)
-npm run lint               # ESLint
-```
-
-> **Auto-hook:** After every `Edit` or `Write` on a `.ts`/`.tsx` file, the PostToolUse hook in `.claude/hooks/lint-typecheck.sh` automatically runs `tsc --noEmit` and `eslint` on the changed file. Lint/typecheck errors will surface immediately after edits.
+> **Auto-hook:** After every `Edit` or `Write` on a `.ts`/`.tsx` file, the PostToolUse hook in `.claude/hooks/lint-typecheck.sh` automatically runs `bin/sv lint <file>`. Lint/typecheck errors will surface immediately after edits.
 
 ---
 
@@ -126,4 +117,10 @@ Local Azurite credentials are hardcoded in `docker-compose.yml` (standard emulat
 - Use TypeScript strict mode — no `any` types
 - Prefer server components; use `"use client"` only when needed
 - Follow existing patterns in the codebase for consistency
-- Run `npm run typecheck` and `npm run lint` before considering work done
+- Run `bin/sv check` before considering work done
+
+---
+
+## Harness-first rule
+
+**Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** The CLI harness is the canonical interface for development, testing, linting, and deployment. If you encounter a workflow that `bin/sv` doesn't cover, suggest extending it with a new subcommand rather than inlining ad-hoc commands.

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 ENV="${1:-}"
 if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
-  echo "Usage: bin/deploy <dev|prod>" >&2
+  echo "Usage: bin/sv deploy <dev|prod>" >&2
   exit 1
 fi
 
@@ -50,13 +50,13 @@ RESOURCE_GROUP="rg-splitvibe-$ENV"
 echo "==> Discovering ACR in $RESOURCE_GROUP..."
 if ! az group show --name "$RESOURCE_GROUP" > /dev/null 2>&1; then
   echo "==> Error: resource group $RESOURCE_GROUP not found." >&2
-  echo "    Run 'bin/infra $ENV' first to provision infrastructure." >&2
+  echo "    Run 'bin/sv infra $ENV' first to provision infrastructure." >&2
   exit 1
 fi
 ACR_LOGIN_SERVER=$(az acr list --resource-group "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
 if [ -z "$ACR_LOGIN_SERVER" ]; then
   echo "==> Error: no ACR found in $RESOURCE_GROUP." >&2
-  echo "    Run 'bin/infra $ENV' first to provision infrastructure." >&2
+  echo "    Run 'bin/sv infra $ENV' first to provision infrastructure." >&2
   exit 1
 fi
 
@@ -98,7 +98,7 @@ deploy_cmd+=(--parameters "authGoogleSecret=$AUTH_GOOGLE_SECRET")
 
 # Bind custom domain with managed TLS certificate (idempotent)
 if [ -n "${CUSTOM_DOMAIN:-}" ]; then
-  bin/domain "$ENV"
+  bin/sv domain "$ENV"
 fi
 
 # Print summary

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+COMMANDS_DIR="$SCRIPT_DIR/commands"
+
+usage() {
+  cat <<EOF
+sv — SplitVibe engineering CLI
+
+Usage: bin/sv <command> [args]
+
+Commands:
+  up                 Start backend services (docker + db + migrations)
+  down               Tear down backend services and kill port 3000
+  serve              Start Next.js dev server only
+  test [args]        Run tests (--e2e, --watch, path)
+  check              Full quality gate (typecheck -> lint -> test)
+  lint [file]        Typecheck + lint (project-wide or single file)
+  deploy <env>       Build, push, deploy (dev|prod)
+  infra <env>        Provision Azure infrastructure (dev|prod)
+  domain <env>       Bind custom domain + TLS (dev|prod)
+  docs [topic]       List doc topics or print doc content
+
+Run 'bin/sv docs' to browse project documentation.
+EOF
+}
+
+CMD="${1:-}"
+
+if [ -z "$CMD" ] || [ "$CMD" = "--help" ] || [ "$CMD" = "-h" ]; then
+  usage
+  exit 0
+fi
+
+shift
+
+COMMAND_SCRIPT="$COMMANDS_DIR/$CMD.sh"
+
+if [ ! -f "$COMMAND_SCRIPT" ]; then
+  echo "Error: unknown command '$CMD'" >&2
+  echo "Run 'bin/sv --help' for available commands." >&2
+  exit 1
+fi
+
+exec "$COMMAND_SCRIPT" "$@"

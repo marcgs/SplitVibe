@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 ENV="${1:-}"
 if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
-  echo "Usage: bin/infra <dev|prod>" >&2
+  echo "Usage: bin/sv infra <dev|prod>" >&2
   exit 1
 fi
 
@@ -80,4 +80,4 @@ echo "    Resource group: $RG"
 echo "    ACR:            $ACR"
 echo "    App URL:        $APP_URL"
 echo ""
-echo "Next step: bin/deploy $ENV"
+echo "Next step: bin/sv deploy $ENV"
