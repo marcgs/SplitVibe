@@ -18,8 +18,6 @@ A pull request number or URL from the **marcgs/SplitVibe** repository.
 
 **Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** If a workflow isn't covered, suggest extending the harness with a new subcommand. Run `bin/sv docs tech` for architecture and setup details.
 
-Note: validate-pr cannot use `bin/sv dev` directly because it operates in a worktree with a custom teardown/startup lifecycle. Step 4 below spells out the necessary low-level commands — these are the exception, not the rule.
-
 ## Steps
 
 ### 1. Resolve the PR and linked GitHub issue
@@ -66,9 +64,12 @@ Use a **git worktree** so the user's current checkout is not disturbed.
   `git worktree remove ../splitvibe-validate --force 2>/dev/null`
 - Create the worktree:
   `git worktree add ../splitvibe-validate <branch>`
-- **`cd ../splitvibe-validate`** — all subsequent commands (npm install,
-  prisma, npm run dev, docker compose) run from this directory.
+- **`cd ../splitvibe-validate`** — all subsequent commands run from this
+  directory.
 - `npm install` — ensure dependencies are up to date for this branch.
+
+> All `bin/sv` commands resolve `PROJECT_ROOT` relative to the script
+> location, so they work correctly from inside the worktree.
 
 ### 4. Start a clean dev environment
 
@@ -76,19 +77,13 @@ Always start from a **clean slate** to avoid stale state, old code, or
 leftover data from previous runs.
 
 1. **Tear down anything already running:**
-   - Kill any process on port 3000
-     (`lsof -ti:3000 | xargs kill 2>/dev/null`).
-   - `docker compose down -v` — stop and remove all containers and
-     volumes.
-2. **Start backend services:**
-   - `docker compose up -d db storage` — start Postgres and Azurite.
-   - Wait for Postgres to be ready
-     (`docker compose exec db pg_isready -U postgres`; retry if needed).
-3. **Apply migrations:**
-   - `npx prisma migrate dev` — apply pending migrations to a fresh DB.
-4. **Start the Next.js dev server** (async/detached so it keeps running):
-   - `npm run dev`
-5. **Wait for the server to be ready:**
+   - `bin/sv env-down` — kill port 3000, stop containers, remove volumes.
+2. **Start backend services + apply migrations:**
+   - `bin/sv env-up` — start Postgres & Azurite, wait for DB ready,
+     generate Prisma client, run migrations.
+3. **Start the Next.js dev server** (async/detached so it keeps running):
+   - `bin/sv serve`
+4. **Wait for the server to be ready:**
    - Poll `curl -sf http://localhost:3000` with retries (up to ~30 s).
    - If it still fails after retries, mark all criteria as
      ⏭️ **Blocked** and skip to step 7 (report).
@@ -164,8 +159,7 @@ step 6.
 
 After posting results, **always** clean up:
 
-1. Stop the Next.js dev server (kill the process on port 3000).
-2. `docker compose down -v` — stop and remove all containers and volumes.
-3. `cd` back to the original repository root.
-4. `git worktree remove ../splitvibe-validate --force` — remove the
+1. `bin/sv env-down` — kill dev server, stop containers, remove volumes.
+2. `cd` back to the original repository root.
+3. `git worktree remove ../splitvibe-validate --force` — remove the
    temporary worktree.

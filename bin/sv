@@ -12,6 +12,9 @@ Usage: bin/sv <command> [args]
 
 Commands:
   dev                Start dev environment (docker + db + Next.js)
+  env-up             Start backend services (docker + db + migrations)
+  env-down           Tear down backend services and kill port 3000
+  serve              Start Next.js dev server only
   test [args]        Run tests (--e2e, --watch, path)
   check              Full quality gate (typecheck -> lint -> test)
   lint [file]        Typecheck + lint (project-wide or single file)
