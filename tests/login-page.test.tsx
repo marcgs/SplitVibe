@@ -1,52 +1,37 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+import LoginForm from "@/app/(auth)/login/login-form";
 
-const mockSignIn = vi.fn();
+const mockSignIn = vi.hoisted(() => vi.fn());
 
 vi.mock("next-auth/react", () => ({
   signIn: mockSignIn,
 }));
 
 describe("Login page", () => {
-  it("should show Google sign-in and hide mock login in production", async () => {
-    vi.stubEnv("NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS", "false");
-    vi.resetModules();
-
-    const { default: LoginPage } = await import("@/app/(auth)/login/page");
-    render(<LoginPage />);
+  it("should show Google sign-in and hide mock login when test accounts disabled", () => {
+    render(<LoginForm showTestAccounts={false} />);
 
     expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
     expect(screen.queryByText("Select a mock user to sign in")).not.toBeInTheDocument();
-
-    vi.unstubAllEnvs();
+    expect(screen.queryByText("Dev only")).not.toBeInTheDocument();
   });
 
-  it("should keep mock login available in development", async () => {
-    vi.stubEnv("NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS", "true");
-    vi.resetModules();
-
-    const { default: LoginPage } = await import("@/app/(auth)/login/page");
-    render(<LoginPage />);
+  it("should show mock login buttons when test accounts enabled", () => {
+    render(<LoginForm showTestAccounts={true} />);
 
     expect(screen.getByText("Dev only")).toBeInTheDocument();
     expect(screen.getByText("alice@splitvibe.dev")).toBeInTheDocument();
-
-    vi.unstubAllEnvs();
   });
 
   it("should start Google sign-in with the dashboard callback", async () => {
-    vi.stubEnv("NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS", "false");
-    vi.resetModules();
     const user = userEvent.setup();
 
-    const { default: LoginPage } = await import("@/app/(auth)/login/page");
-    render(<LoginPage />);
+    render(<LoginForm showTestAccounts={false} />);
 
     await user.click(screen.getByRole("button", { name: "Sign in with Google" }));
 
     expect(mockSignIn).toHaveBeenCalledWith("google", { callbackUrl: "/dashboard" });
-
-    vi.unstubAllEnvs();
   });
 });
