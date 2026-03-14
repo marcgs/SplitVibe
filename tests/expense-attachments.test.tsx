@@ -12,10 +12,10 @@ vi.mock("next/navigation", () => ({
 
 let mockFetchResponses: Array<{ status: number; json: () => Promise<unknown> }> = [];
 
-global.fetch = vi.fn((() => {
+global.fetch = vi.fn(() => {
   const response = mockFetchResponses.shift();
   return Promise.resolve(response ?? { status: 500, json: () => Promise.resolve({}) });
-}) as typeof fetch);
+}) as unknown as typeof fetch;
 
 // Mock URL.createObjectURL for download
 global.URL.createObjectURL = vi.fn(() => "blob:http://localhost/fake");
