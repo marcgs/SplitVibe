@@ -140,7 +140,7 @@ describe("auth configuration", () => {
   });
 
   it("includes mock credentials provider in development", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("ENABLE_SEED_USERS", "true");
     vi.resetModules();
 
     vi.doMock("@/lib/db", () => ({
