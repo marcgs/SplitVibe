@@ -115,4 +115,10 @@ Local Azurite credentials are hardcoded in `docker-compose.yml` (standard emulat
 - Use TypeScript strict mode — no `any` types
 - Prefer server components; use `"use client"` only when needed
 - Follow existing patterns in the codebase for consistency
-- Run `npm run typecheck` and `npm run lint` before considering work done
+- Run `bin/sv check` before considering work done
+
+---
+
+## Harness-first rule
+
+**Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** The CLI harness is the canonical interface for development, testing, linting, and deployment. If you encounter a workflow that `bin/sv` doesn't cover, suggest extending it with a new subcommand rather than inlining ad-hoc commands.

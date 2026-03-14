@@ -27,7 +27,7 @@ Shared-expense tracking PWA. Users create groups, add expenses (with flexible sp
 
 ## CLI — `bin/sv`
 
-Use `bin/sv` as the primary interface for all project commands. Run `bin/sv docs <topic>` to read project documentation.
+**Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** If a workflow isn't covered, suggest extending the harness with a new subcommand. Run `bin/sv docs <topic>` to read project documentation.
 
 ```bash
 bin/sv dev                            # Start dev environment (docker + db + Next.js)

@@ -16,7 +16,9 @@ A pull request number or URL from the **marcgs/SplitVibe** repository.
 
 ## CLI
 
-Use `bin/sv` as the primary interface for project commands. Run `bin/sv docs tech` for architecture and setup details. Note: validate-pr uses its own worktree-based dev setup (see Step 4), not `bin/sv dev`.
+**Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** If a workflow isn't covered, suggest extending the harness with a new subcommand. Run `bin/sv docs tech` for architecture and setup details.
+
+Note: validate-pr cannot use `bin/sv dev` directly because it operates in a worktree with a custom teardown/startup lifecycle. Step 4 below spells out the necessary low-level commands — these are the exception, not the rule.
 
 ## Steps
 
