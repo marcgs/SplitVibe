@@ -1,3 +1,4 @@
+<!-- Counterpart: .claude/skills/validate-pr/SKILL.md — keep in sync -->
 ---
 name: validate-pr
 description: >

@@ -25,6 +25,17 @@ SplitVibe is a shared-expense tracking Progressive Web App (PWA). Users create g
 
 ---
 
+## Key References
+
+- `docs/spec.md` — Product requirements and domain rules
+- `docs/tech.md` — Architecture, auth flow, deployment, env vars
+- `docs/backlog.md` — Story dependencies and context
+- `docs/adr/` — Architecture Decision Records
+- `prisma/schema.prisma` — Database schema
+- `.env.example` — Environment variables (copy to `.env` for local dev)
+
+---
+
 ## Commands — `bin/sv`
 
 Use `bin/sv` as the primary interface for all project commands.
@@ -43,7 +54,6 @@ bin/sv infra <dev|prod>               # Provision Azure infrastructure
 bin/sv domain <dev|prod>              # Bind custom domain + TLS
 bin/sv docs                           # List available doc topics
 bin/sv docs <topic>                   # Print doc content to stdout
-/e2e                                  # Claude-driven Playwright feature validation
 ```
 
 > **Auto-hook:** After every `Edit` or `Write` on a `.ts`/`.tsx` file, the PostToolUse hook in `.claude/hooks/lint-typecheck.sh` automatically runs `bin/sv lint <file>`. Lint/typecheck errors will surface immediately after edits.
@@ -55,19 +65,23 @@ bin/sv docs <topic>                   # Print doc content to stdout
 ```
 SplitVibe/
 ├── app/                   # Next.js App Router pages & layouts
-│   ├── (auth)/            # Auth routes (login, register)
+│   ├── (auth)/            # Auth routes (login)
 │   ├── (app)/             # Authenticated app routes
-│   │   ├── groups/        # Group management
-│   │   ├── expenses/      # Expense CRUD
-│   │   └── settlements/   # Settlement flows
+│   │   ├── dashboard/     # User dashboard
+│   │   └── groups/        # Group management & detail views
 │   ├── api/               # Route handlers
+│   │   ├── attachments/   # Blob upload/download (presign, by id)
+│   │   ├── groups/        # Group CRUD, expenses, settlements, balances, invites
+│   │   └── settlements/   # Settlement delete
+│   ├── join/              # Invite-link acceptance flow
 │   └── globals.css
-├── components/            # Shared React components (shadcn/ui + custom)
 ├── lib/                   # Shared utilities
-│   ├── auth.ts            # Auth.js configuration
-│   ├── db.ts              # Prisma client singleton
-│   ├── storage.ts         # Azure Blob Storage client
-│   └── fx.ts              # FX rate utilities
+│   ├── auth.ts            # Auth.js v5 configuration
+│   ├── auth-middleware.ts  # Edge-compatible auth (no Prisma)
+│   ├── balances.ts        # Balance calculation & debt simplification
+│   ├── db.ts              # Prisma client singleton (@prisma/adapter-pg)
+│   ├── mock-users.ts      # Credential-based test users (dev only)
+│   └── storage.ts         # Azure Blob Storage client
 ├── prisma/
 │   └── schema.prisma      # Database schema
 ├── tests/
@@ -78,8 +92,10 @@ SplitVibe/
 │   ├── hooks/             # Shell hook scripts
 │   └── skills/            # Custom slash commands (skills)
 ├── docs/
-│   ├── spec.md            # Full product requirements & domain rules
-│   └── tech.md            # Architecture, auth flow, deployment, env vars
+│   ├── spec.md            # Product requirements & domain rules
+│   ├── tech.md            # Architecture, auth flow, deployment, env vars
+│   ├── backlog.md         # Story dependencies and context
+│   └── adr/               # Architecture Decision Records
 ├── docker-compose.yml
 ├── Dockerfile
 ├── vitest.config.ts
@@ -97,16 +113,20 @@ Copy `.env.example` to `.env` for local development without Docker. Docker Compo
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | Postgres connection string |
-| `NEXTAUTH_SECRET` | Auth.js signing secret |
-| `NEXTAUTH_URL` | Public base URL of the app |
+| `AUTH_SECRET` | Auth.js v5 signing secret |
+| `AUTH_URL` | Public base URL of the app |
 | `AUTH_GOOGLE_ID` | Google OAuth client ID |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
-| `AUTH_APPLE_ID` | Apple OAuth client ID |
-| `AUTH_APPLE_SECRET` | Apple OAuth client secret |
+| `AUTH_GITHUB_ID` | GitHub OAuth client ID |
+| `AUTH_GITHUB_SECRET` | GitHub OAuth client secret |
 | `AZURE_STORAGE_ACCOUNT_NAME` | Blob Storage account name |
-| `AZURE_STORAGE_ACCOUNT_KEY` | Blob Storage account key |
+| `AZURE_STORAGE_ACCOUNT_KEY` | Blob Storage account key (local dev / Azurite) |
 | `AZURE_STORAGE_CONTAINER_NAME` | Blob container name for attachments |
 | `AZURE_STORAGE_CONNECTION_STRING` | Full connection string (Azurite in dev) |
+| `FX_API_KEY` | Foreign exchange rate API key |
+| `FX_API_BASE_URL` | FX rate API base URL |
+| `NEXT_PUBLIC_APP_URL` | Client-side app URL |
+| `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` | Enable mock credential login (dev only) |
 
 Local Azurite credentials are hardcoded in `docker-compose.yml` (standard emulator defaults).
 

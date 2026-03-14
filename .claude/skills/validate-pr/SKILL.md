@@ -1,3 +1,4 @@
+<!-- Counterpart: .github/agents/validate-pr.agent.md — keep in sync -->
 ---
 name: validate-pr
 description: >

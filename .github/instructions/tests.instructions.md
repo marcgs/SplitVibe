@@ -1,5 +1,5 @@
 ---
-applyTo: "tests/**/*.ts"
+applyTo: "tests/**/*.test.ts"
 ---
 
 # Test Conventions (Vitest)

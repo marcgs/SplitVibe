@@ -25,6 +25,17 @@ Shared-expense tracking PWA. Users create groups, add expenses (with flexible sp
 
 ---
 
+## TDD Workflow
+
+**Always write failing tests first.**
+
+1. Write a failing test that describes the desired behavior
+2. Implement the minimal code to make it pass
+3. Refactor while keeping tests green
+4. Never skip tests — all features must have coverage
+
+---
+
 ## CLI — `bin/sv`
 
 **Always use `bin/sv` instead of raw `npm`, `npx`, or `docker compose` commands.** If a workflow isn't covered, suggest extending the harness with a new subcommand. Run `bin/sv docs <topic>` to read project documentation.
@@ -44,3 +55,14 @@ bin/sv domain <dev|prod>              # Bind custom domain + TLS
 bin/sv docs                           # List available doc topics
 bin/sv docs <topic>                   # Print doc content to stdout
 ```
+
+---
+
+## Coding Conventions
+
+- Use TypeScript strict mode — no `any` types
+- Prefer server components; use `"use client"` only when needed
+- Follow existing patterns in the codebase for consistency
+- Run `bin/sv check` before considering work done
+
+See `.github/instructions/` for file-scoped conventions (API routes, React, TypeScript, tests, Prisma).

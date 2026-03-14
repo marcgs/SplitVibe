@@ -1,3 +1,4 @@
+<!-- Counterpart: .github/agents/implement.agent.md — keep in sync -->
 ---
 name: implement
 description: >

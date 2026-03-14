@@ -1,3 +1,4 @@
+<!-- Counterpart: .claude/skills/implement/SKILL.md — keep in sync -->
 ---
 name: implement
 description: >
