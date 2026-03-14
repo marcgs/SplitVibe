@@ -74,6 +74,12 @@ async function generateSasToken(
   }
 
   const blobServiceClient = getBlobServiceClient();
+  console.log("[storage] getUserDelegationKey:", {
+    accountName: getAccountName(),
+    clientId: process.env.AZURE_CLIENT_ID,
+    hasConnectionString: !!process.env.AZURE_STORAGE_CONNECTION_STRING,
+    url: blobServiceClient.url,
+  });
   const delegationKey = await blobServiceClient.getUserDelegationKey(
     startsOn,
     expiresOn
