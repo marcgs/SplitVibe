@@ -112,11 +112,7 @@ describe("ExpenseAttachments", () => {
   it("uploads a valid file and shows it in the list", async () => {
     const user = userEvent.setup();
     mockFetch(
-      // presign response
-      { status: 200, body: { uploadUrl: "http://storage/upload?sig=x", blobName: "uuid.jpg" } },
-      // upload to blob storage
-      { status: 201, body: {} },
-      // save attachment reference
+      // Single upload endpoint response
       { status: 201, body: { id: "att-new", fileName: "receipt.jpg", contentType: "image/jpeg" } }
     );
 
@@ -131,7 +127,7 @@ describe("ExpenseAttachments", () => {
     });
   });
 
-  it("shows error when presign API fails", async () => {
+  it("shows error when upload API fails", async () => {
     const user = userEvent.setup();
     mockFetch(
       { status: 400, body: { error: "Something went wrong on the server" } }

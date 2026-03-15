@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { generateReadSasUrl } from "@/lib/storage";
+import { downloadBlob } from "@/lib/storage";
+import { Readable } from "stream";
 
 export async function GET(
   _request: Request,
@@ -37,7 +38,15 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const url = await generateReadSasUrl(attachment.blobUrl);
+  const { stream, contentType, contentLength } = await downloadBlob(attachment.blobUrl);
 
-  return NextResponse.json({ url });
+  const webStream = Readable.toWeb(Readable.from(stream)) as ReadableStream;
+
+  return new Response(webStream, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(contentLength),
+      "Content-Disposition": `attachment; filename="${attachment.fileName}"`,
+    },
+  });
 }

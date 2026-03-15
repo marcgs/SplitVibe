@@ -62,61 +62,22 @@ export default function ExpenseAttachments({
     setUploading(true);
 
     try {
-      // Step 1: Get presigned upload URL
-      const presignRes = await fetch("/api/attachments/presign", {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("expenseId", expenseId);
+
+      const res = await fetch("/api/attachments/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          expenseId,
-          fileName: file.name,
-          contentType: file.type,
-          fileSize: file.size,
-        }),
+        body: formData,
       });
 
-      if (!presignRes.ok) {
-        const data = await presignRes.json();
-        setError(data.error ?? "Failed to prepare upload");
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to upload file");
         return;
       }
 
-      const { uploadUrl, blobName } = await presignRes.json();
-
-      // Step 2: Upload file directly to blob storage
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "x-ms-blob-type": "BlockBlob",
-          "Content-Type": file.type,
-        },
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        setError("Failed to upload file");
-        return;
-      }
-
-      // Step 3: Save attachment reference
-      const saveRes = await fetch("/api/attachments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          expenseId,
-          fileName: file.name,
-          contentType: file.type,
-          blobName,
-          sizeBytes: file.size,
-        }),
-      });
-
-      if (!saveRes.ok) {
-        const data = await saveRes.json();
-        setError(data.error ?? "Failed to save attachment");
-        return;
-      }
-
-      const saved = await saveRes.json();
+      const saved = await res.json();
       setAttachments((prev) => [...prev, saved]);
       router.refresh();
     } catch {
@@ -126,15 +87,8 @@ export default function ExpenseAttachments({
     }
   }
 
-  async function handleDownload(attachment: Attachment) {
-    try {
-      const res = await fetch(`/api/attachments/${attachment.id}`);
-      if (!res.ok) return;
-      const { url } = await res.json();
-      window.open(url, "_blank");
-    } catch {
-      // Silently fail — user can retry
-    }
+  function handleDownload(attachment: Attachment) {
+    window.open(`/api/attachments/${attachment.id}`, "_blank");
   }
 
   return (
