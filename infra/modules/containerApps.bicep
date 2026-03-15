@@ -117,6 +117,10 @@ var containerEnv = concat([
     value: 'production'
   }
   {
+    name: 'ENABLE_TEST_ACCOUNTS'
+    value: environment == 'dev' ? 'true' : 'false'
+  }
+  {
     name: 'PORT'
     value: '3000'
   }

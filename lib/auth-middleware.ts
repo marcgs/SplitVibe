@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { mockUsers } from "@/lib/mock-users";
 
-const isDev = process.env.NODE_ENV === "development";
+const isDev = process.env.ENABLE_TEST_ACCOUNTS === "true";
 
 const mockProvider = Credentials({
   name: "Mock User",
