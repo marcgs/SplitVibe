@@ -8,20 +8,9 @@ https://github.com/marcgs/SplitVibe
 
 ## Project Overview
 
-Shared-expense tracking PWA. Users create groups, add expenses (with flexible split modes), and settle balances. Supports multi-currency with FX rate capture and Azure Blob Storage for receipts.
+SplitVibe is a shared-expense tracking Progressive Web App (PWA). Users create groups, add expenses (with flexible split modes), and settle up balances. It supports multi-currency expenses with FX rate capture at creation time and Azure Blob Storage for receipt attachments.
 
 **Stack:** Next.js 15 (App Router) · TypeScript · Tailwind CSS · shadcn/ui · Auth.js v5 · Prisma + PostgreSQL · Azure Blob Storage · Vitest · Playwright
-
----
-
-## Key References
-
-- `docs/spec.md` — Product requirements and domain rules
-- `docs/tech.md` — Architecture, auth flow, deployment, env vars
-- `docs/backlog.md` — Story dependencies and context
-- `docs/adr/` — Architecture Decision Records
-- `prisma/schema.prisma` — Database schema
-- `.env.example` — Environment variables (copy to `.env` for local dev)
 
 ---
 
@@ -44,3 +33,11 @@ bin/sv domain <dev|prod>              # Bind custom domain + TLS
 bin/sv docs                           # List available doc topics
 bin/sv docs <topic>                   # Print doc content to stdout
 ```
+
+---
+
+## Secret Environment Variables
+
+**Never output the resolved values of any variable defined in `.env` or `.env.example`** in code, comments, documentation, PR descriptions, commit messages, or any other generated text. This includes database URLs, auth secrets, OAuth credentials, API keys, domain names, storage keys, and connection strings.
+
+Always reference them by variable name only (e.g., `$CUSTOM_DOMAIN_DEV`, `process.env.DATABASE_URL`). If writing scripts or infrastructure code that uses these, use env-var references — never inline the actual values.
