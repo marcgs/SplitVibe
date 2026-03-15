@@ -11,7 +11,7 @@ vi.mock("@azure/storage-blob", () => ({
     fromConnectionString: vi.fn().mockReturnValue({
       getContainerClient: vi.fn().mockReturnValue({
         getBlockBlobClient: vi.fn().mockReturnValue({
-          url: "http://storage:10000/devstoreaccount1/splitvibe-attachments/test-blob",
+          url: "http://storage:10000/devstoreaccount1/attachments/test-blob",
         }),
       }),
       getUserDelegationKey: vi.fn().mockResolvedValue({
@@ -46,7 +46,7 @@ describe("storage client", () => {
     vi.stubEnv("AZURE_STORAGE_CONNECTION_STRING", "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://storage:10000/devstoreaccount1;");
     vi.stubEnv("AZURE_STORAGE_ACCOUNT_NAME", "devstoreaccount1");
     vi.stubEnv("AZURE_STORAGE_ACCOUNT_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==");
-    vi.stubEnv("AZURE_STORAGE_CONTAINER_NAME", "splitvibe-attachments");
+    vi.stubEnv("AZURE_STORAGE_CONTAINER_NAME", "attachments");
   });
 
   it("generateUploadSasUrl returns a URL with SAS token", async () => {
@@ -79,7 +79,7 @@ describe("storage client", () => {
     vi.stubEnv("AZURE_STORAGE_CONNECTION_STRING", "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://storage:10000/devstoreaccount1;");
     vi.stubEnv("AZURE_STORAGE_ACCOUNT_NAME", "devstoreaccount1");
     vi.stubEnv("AZURE_STORAGE_ACCOUNT_KEY", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==");
-    vi.stubEnv("AZURE_STORAGE_CONTAINER_NAME", "splitvibe-attachments");
+    vi.stubEnv("AZURE_STORAGE_CONTAINER_NAME", "attachments");
 
     const { generateReadSasUrl } = await import("@/lib/storage");
     const url = await generateReadSasUrl("test-blob.jpg");

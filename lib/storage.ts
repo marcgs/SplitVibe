@@ -17,7 +17,7 @@ function getAccountName(): string {
 }
 
 function getContainerName(): string {
-  return process.env.AZURE_STORAGE_CONTAINER_NAME ?? "splitvibe-attachments";
+  return process.env.AZURE_STORAGE_CONTAINER_NAME ?? "attachments";
 }
 
 function getBlobServiceClient(): BlobServiceClient {

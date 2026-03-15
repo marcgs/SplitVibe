@@ -22,11 +22,11 @@ vi.mock("@/lib/db", () => ({ db: mockDb }));
 
 vi.mock("@/lib/storage", () => ({
   generateUploadSasUrl: vi.fn().mockResolvedValue({
-    uploadUrl: "http://storage:10000/devstoreaccount1/splitvibe-attachments/abc.jpg?sv=2024&sig=fake",
+    uploadUrl: "http://storage:10000/devstoreaccount1/attachments/abc.jpg?sv=2024&sig=fake",
     blobName: "abc.jpg",
   }),
   generateReadSasUrl: vi.fn().mockResolvedValue(
-    "http://storage:10000/devstoreaccount1/splitvibe-attachments/abc.jpg?sv=2024&sig=fakeread"
+    "http://storage:10000/devstoreaccount1/attachments/abc.jpg?sv=2024&sig=fakeread"
   ),
 }));
 
