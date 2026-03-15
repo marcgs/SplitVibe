@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { generateUploadSasUrl } from "@/lib/storage";
-import { z } from "zod";
+import { uploadBlob } from "@/lib/storage";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_ATTACHMENTS_PER_EXPENSE = 5;
@@ -14,38 +13,35 @@ const ALLOWED_CONTENT_TYPES = [
   "application/pdf",
 ] as const;
 
-const presignSchema = z.object({
-  expenseId: z.string().min(1),
-  fileName: z.string().min(1),
-  contentType: z.string().min(1),
-  fileSize: z.number().int().positive(),
-});
-
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: unknown;
+  let formData: FormData;
   try {
-    body = await request.json();
+    formData = await request.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
-  const parsed = presignSchema.safeParse(body);
-  if (!parsed.success) {
+  const file = formData.get("file");
+  const expenseId = formData.get("expenseId");
+
+  if (!(file instanceof File) || typeof expenseId !== "string" || !expenseId) {
     return NextResponse.json(
-      { error: "Validation failed", details: parsed.error.flatten() },
+      { error: "Missing required fields: file and expenseId" },
       { status: 400 }
     );
   }
 
-  const { expenseId, fileName, contentType, fileSize } = parsed.data;
-
   // Validate content type
-  if (!ALLOWED_CONTENT_TYPES.includes(contentType as (typeof ALLOWED_CONTENT_TYPES)[number])) {
+  if (
+    !ALLOWED_CONTENT_TYPES.includes(
+      file.type as (typeof ALLOWED_CONTENT_TYPES)[number]
+    )
+  ) {
     return NextResponse.json(
       { error: "File type not allowed. Accepted: JPEG, PNG, WebP, HEIC, PDF." },
       { status: 400 }
@@ -53,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   // Validate file size
-  if (fileSize > MAX_FILE_SIZE) {
+  if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json(
       { error: "File exceeds the 10 MB size limit." },
       { status: 400 }
@@ -94,11 +90,30 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { uploadUrl, blobName } = await generateUploadSasUrl(fileName, contentType);
-    return NextResponse.json({ uploadUrl, blobName });
+    const { blobName } = await uploadBlob(
+      file.stream(),
+      file.type,
+      file.name,
+      file.size
+    );
+
+    const attachment = await db.attachment.create({
+      data: {
+        expenseId,
+        fileName: file.name,
+        contentType: file.type,
+        blobUrl: blobName,
+        sizeBytes: file.size,
+      },
+    });
+
+    return NextResponse.json(attachment, { status: 201 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown storage error";
-    console.error("Presign error:", message);
-    return NextResponse.json({ error: "Storage error", details: message }, { status: 500 });
+    console.error("Upload error:", message);
+    return NextResponse.json(
+      { error: "Storage error", details: message },
+      { status: 500 }
+    );
   }
 }

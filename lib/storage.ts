@@ -1,12 +1,7 @@
-import {
-  BlobServiceClient,
-  generateBlobSASQueryParameters,
-  StorageSharedKeyCredential,
-  BlobSASPermissions,
-  SASProtocol,
-} from "@azure/storage-blob";
+import { BlobServiceClient } from "@azure/storage-blob";
 import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
 import { randomUUID } from "crypto";
+import { Readable } from "stream";
 
 function isAzurite(): boolean {
   return !!process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -17,7 +12,7 @@ function getAccountName(): string {
 }
 
 function getContainerName(): string {
-  return process.env.AZURE_STORAGE_CONTAINER_NAME ?? "splitvibe-attachments";
+  return process.env.AZURE_STORAGE_CONTAINER_NAME ?? "attachments";
 }
 
 function getBlobServiceClient(): BlobServiceClient {
@@ -37,72 +32,12 @@ function getBlobServiceClient(): BlobServiceClient {
   );
 }
 
-function getReadTtlMinutes(): number {
-  const envVal = process.env.ATTACHMENT_READ_TTL_MINUTES;
-  if (envVal) {
-    const parsed = parseInt(envVal, 10);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-  return 15;
-}
-
-async function generateSasToken(
-  blobName: string,
-  permissions: string,
-  expiresOn: Date,
-  contentType?: string
-): Promise<string> {
-  const containerName = getContainerName();
-  const startsOn = new Date();
-
-  if (isAzurite()) {
-    const accountName = getAccountName();
-    const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY ?? "";
-    const credential = new StorageSharedKeyCredential(accountName, accountKey);
-    return generateBlobSASQueryParameters(
-      {
-        containerName,
-        blobName,
-        permissions: BlobSASPermissions.parse(permissions),
-        startsOn,
-        expiresOn,
-        contentType,
-        protocol: SASProtocol.HttpsAndHttp,
-      },
-      credential
-    ).toString();
-  }
-
-  const blobServiceClient = getBlobServiceClient();
-  console.log("[storage] getUserDelegationKey:", {
-    accountName: getAccountName(),
-    clientId: process.env.AZURE_CLIENT_ID,
-    hasConnectionString: !!process.env.AZURE_STORAGE_CONNECTION_STRING,
-    url: blobServiceClient.url,
-  });
-  const delegationKey = await blobServiceClient.getUserDelegationKey(
-    startsOn,
-    expiresOn
-  );
-  return generateBlobSASQueryParameters(
-    {
-      containerName,
-      blobName,
-      permissions: BlobSASPermissions.parse(permissions),
-      startsOn,
-      expiresOn,
-      contentType,
-      protocol: SASProtocol.Https,
-    },
-    delegationKey,
-    getAccountName()
-  ).toString();
-}
-
-export async function generateUploadSasUrl(
+export async function uploadBlob(
+  stream: ReadableStream,
+  contentType: string,
   originalFileName: string,
-  contentType: string
-): Promise<{ uploadUrl: string; blobName: string }> {
+  sizeBytes: number
+): Promise<{ blobName: string }> {
   const ext = originalFileName.split(".").pop() ?? "";
   const blobName = `${randomUUID()}.${ext}`;
 
@@ -110,23 +45,27 @@ export async function generateUploadSasUrl(
   const containerClient = blobServiceClient.getContainerClient(getContainerName());
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-  const expiresOn = new Date(Date.now() + 10 * 60 * 1000);
-  const sasToken = await generateSasToken(blobName, "cw", expiresOn, contentType);
+  const nodeStream = Readable.fromWeb(stream as Parameters<typeof Readable.fromWeb>[0]);
 
-  return {
-    uploadUrl: `${blockBlobClient.url}?${sasToken}`,
-    blobName,
-  };
+  await blockBlobClient.uploadStream(nodeStream, sizeBytes, undefined, {
+    blobHTTPHeaders: { blobContentType: contentType },
+  });
+
+  return { blobName };
 }
 
-export async function generateReadSasUrl(blobName: string): Promise<string> {
+export async function downloadBlob(
+  blobName: string
+): Promise<{ stream: NodeJS.ReadableStream; contentType: string; contentLength: number }> {
   const blobServiceClient = getBlobServiceClient();
   const containerClient = blobServiceClient.getContainerClient(getContainerName());
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-  const ttlMinutes = getReadTtlMinutes();
-  const expiresOn = new Date(Date.now() + ttlMinutes * 60 * 1000);
-  const sasToken = await generateSasToken(blobName, "r", expiresOn);
+  const response = await blockBlobClient.download(0);
 
-  return `${blockBlobClient.url}?${sasToken}`;
+  return {
+    stream: response.readableStreamBody!,
+    contentType: response.contentType ?? "application/octet-stream",
+    contentLength: response.contentLength ?? 0,
+  };
 }

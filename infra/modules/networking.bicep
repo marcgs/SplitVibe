@@ -49,6 +49,12 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
           ]
         }
       }
+      {
+        name: 'snet-private-endpoints'
+        properties: {
+          addressPrefix: '10.0.3.0/24'
+        }
+      }
     ]
   }
 }
@@ -76,5 +82,11 @@ output containerAppsSubnetId string = vnet.properties.subnets[0].id
 @description('PostgreSQL subnet ID')
 output postgresSubnetId string = vnet.properties.subnets[1].id
 
+@description('Private Endpoints subnet ID')
+output privateEndpointSubnetId string = vnet.properties.subnets[2].id
+
 @description('Private DNS zone ID')
 output privateDnsZoneId string = privateDnsZone.id
+
+@description('VNet resource ID')
+output vnetId string = vnet.id
