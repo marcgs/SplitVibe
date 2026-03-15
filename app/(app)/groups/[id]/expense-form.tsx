@@ -18,6 +18,8 @@ interface ExpenseFormProps {
   currentUserId: string;
 }
 
+type SplitMode = "EQUAL" | "PERCENTAGE" | "SHARES";
+
 export default function ExpenseForm({ groupId, members, currentUserId }: ExpenseFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
@@ -27,6 +29,9 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
     members.map((m) => m.userId)
   );
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [splitMode, setSplitMode] = useState<SplitMode>("EQUAL");
+  const [percentages, setPercentages] = useState<Record<string, string>>({});
+  const [shares, setShares] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -41,19 +46,47 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (splitMode === "PERCENTAGE") {
+      const sum = splitAmong.reduce((acc, uid) => acc + (parseFloat(percentages[uid] || "0")), 0);
+      if (Math.abs(sum - 100) > 0.001) {
+        setError("Percentages must sum to 100%");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      const body: Record<string, unknown> = {
+        title,
+        amount: parseFloat(amount),
+        paidBy,
+        splitAmong,
+        date,
+        splitMode,
+      };
+
+      if (splitMode === "PERCENTAGE") {
+        const pctMap: Record<string, number> = {};
+        for (const uid of splitAmong) {
+          pctMap[uid] = parseFloat(percentages[uid] || "0");
+        }
+        body.percentages = pctMap;
+      }
+
+      if (splitMode === "SHARES") {
+        const sharesMap: Record<string, number> = {};
+        for (const uid of splitAmong) {
+          sharesMap[uid] = parseInt(shares[uid] || "1", 10);
+        }
+        body.shares = sharesMap;
+      }
+
       const res = await fetch(`/api/groups/${groupId}/expenses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          amount: parseFloat(amount),
-          paidBy,
-          splitAmong,
-          date,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -67,6 +100,9 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
       setPaidBy(currentUserId);
       setSplitAmong(members.map((m) => m.userId));
       setDate(new Date().toISOString().split("T")[0]);
+      setSplitMode("EQUAL");
+      setPercentages({});
+      setShares({});
       router.refresh();
     } catch {
       setError("Something went wrong");
@@ -138,20 +174,68 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
       </div>
 
       <div>
+        <label
+          htmlFor="expense-split-mode"
+          className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        >
+          Split mode
+        </label>
+        <select
+          id="expense-split-mode"
+          value={splitMode}
+          onChange={(e) => setSplitMode(e.target.value as SplitMode)}
+          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        >
+          <option value="EQUAL">Equal</option>
+          <option value="PERCENTAGE">Percentage</option>
+          <option value="SHARES">Shares</option>
+        </select>
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Split among
         </label>
         <div className="space-y-2">
           {members.map((m) => (
-            <label key={m.userId} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={splitAmong.includes(m.userId)}
-                onChange={() => toggleSplitMember(m.userId)}
-                className="rounded border-zinc-300 dark:border-zinc-700"
-              />
-              {m.user.name ?? m.user.email}
-            </label>
+            <div key={m.userId} className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={splitAmong.includes(m.userId)}
+                  onChange={() => toggleSplitMember(m.userId)}
+                  className="rounded border-zinc-300 dark:border-zinc-700"
+                />
+                {m.user.name ?? m.user.email}
+              </label>
+              {splitMode === "PERCENTAGE" && splitAmong.includes(m.userId) && (
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={percentages[m.userId] ?? ""}
+                  onChange={(e) =>
+                    setPercentages((prev) => ({ ...prev, [m.userId]: e.target.value }))
+                  }
+                  placeholder="%"
+                  className="w-20 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              )}
+              {splitMode === "SHARES" && splitAmong.includes(m.userId) && (
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={shares[m.userId] ?? ""}
+                  onChange={(e) =>
+                    setShares((prev) => ({ ...prev, [m.userId]: e.target.value }))
+                  }
+                  placeholder="Weight"
+                  className="w-20 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              )}
+            </div>
           ))}
         </div>
       </div>
