@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/lint-typecheck.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-env-leak.sh"
           }
         ]
       }
