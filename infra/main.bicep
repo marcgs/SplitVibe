@@ -44,6 +44,9 @@ param customDomain string = ''
 @description('Container port (default 3000 for SplitVibe; use 80 for placeholder quickstart image)')
 param targetPort int = 3000
 
+@description('Minimum number of container replicas (set to 1 for prod to avoid cold-start delays)')
+param minReplicas int = 0
+
 @description('Google OAuth client ID (optional — supply when ready to enable Google sign-in)')
 param authGoogleId string = ''
 
@@ -235,6 +238,7 @@ module containerApps 'modules/containerApps.bicep' = {
     managedIdentityId: managedIdentity.outputs.id
     managedIdentityClientId: managedIdentity.outputs.clientId
     targetPort: targetPort
+    minReplicas: minReplicas
   }
 }
 

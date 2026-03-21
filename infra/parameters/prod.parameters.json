@@ -13,6 +13,9 @@
     },
     "postgresAdminLogin": {
       "value": "splitvibeadmin"
+    },
+    "minReplicas": {
+      "value": 1
     }
   }
 }
