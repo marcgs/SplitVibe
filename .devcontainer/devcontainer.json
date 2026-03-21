@@ -41,7 +41,7 @@
     "3000": { "label": "Next.js", "onAutoForward": "notify" }
   },
   "onCreateCommand": "npm ci && npx playwright install --with-deps chromium",
-  "postStartCommand": ".devcontainer/post-start.sh",
+  "postStartCommand": "bin/sv up",
   "waitFor": "postStartCommand",
   "customizations": {
     "vscode": {
