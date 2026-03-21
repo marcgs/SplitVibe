@@ -12,7 +12,8 @@
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "moby": false
     },
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/copilot-cli:1": {}
   },
   "remoteUser": "node",
   "mounts": [
