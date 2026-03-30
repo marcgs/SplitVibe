@@ -17,7 +17,9 @@ Commands:
   test [args]        Run tests (--e2e, --watch, path)
   check              Full quality gate (typecheck -> lint -> test)
   lint [file]        Typecheck + lint (project-wide or single file)
-  deploy <env>       Build, push, deploy (dev|prod)
+  deploy <env>       Build, push, deploy to Azure (dev|prod)
+  deploy-vercel <env> Deploy to Vercel (dev|prod)
+  env-vercel <env>   Sync environment variables to Vercel (dev|prod)
   infra <env>        Provision Azure infrastructure (dev|prod)
   domain <env>       Bind custom domain + TLS (dev|prod)
   check-env-leak     Scan diff for leaked .env values
