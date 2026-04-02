@@ -93,7 +93,7 @@ var containerEnv = concat([
     secretRef: 'database-url'
   }
   {
-    name: 'NEXTAUTH_SECRET'
+    name: 'AUTH_SECRET'
     secretRef: 'nextauth-secret'
   }
   {
