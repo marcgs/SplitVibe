@@ -113,7 +113,7 @@ GitHub Actions
 
 ## 6. CI/CD (GitHub Actions)
 
-Two workflows:
+Two standard workflows plus one [agentic workflow](https://github.github.com/gh-aw/) (`gh-aw`):
 
 ### `ci.yml` — runs on every pull request
 1. Install dependencies
@@ -127,6 +127,16 @@ Two workflows:
 2. Push to Azure Container Registry
 3. Deploy new revision to Azure Container Apps
 4. Run Prisma migrations against the production database
+
+### `docs-maintainer.md` — daily agentic workflow
+
+A read-only Copilot agent (gh-aw) that diffs the last 24 h of `main` (capped at 50 commits) against `docs/spec.md`, `docs/tech.md`, and `README.md`. Opens at most **1 draft PR** (`[docs]` prefix, labels `documentation`/`agentic`, branch `agent/docs-maintainer/*`, allow-listed to those three files) for small mechanical fixes, or up to **2 issues** (`[docs-drift]` prefix, same labels) for larger drift. Threat-detection gates all outputs.
+
+- **Authoring:** edit `.github/workflows/docs-maintainer.md`, then `gh extension install githubnext/gh-aw && gh aw compile` and commit the regenerated `.lock.yml`.
+- **Required secret:** `COPILOT_GITHUB_TOKEN` (configured in repo Actions secrets).
+- **Manual run:** Actions tab → *Documentation Maintainer* → **Run workflow**.
+- **Disable:** Actions tab → **Disable workflow**, or `gh aw disable docs-maintainer`.
+- **Fork-safe:** triggers are `schedule` + `workflow_dispatch` only, and the secret is unavailable on forks.
 
 ---
 
@@ -178,77 +188,3 @@ Two workflows:
 | `AZURE_STORAGE_ACCOUNT_KEY` | Blob Storage account key |
 | `AZURE_STORAGE_CONTAINER_NAME` | Blob container name for attachments |
 
----
-
-## 11. Agentic workflows
-
-We use [GitHub Agentic Workflows (`gh-aw`)](https://github.github.com/gh-aw/) to
-run scheduled, read-only agents that produce structured output (PRs and
-issues) through gh-aw's safe-output gates. The agent itself receives only
-read permissions; all writes are performed by separate, permission-controlled
-jobs after a built-in threat-detection step.
-
-### Setup
-
-Install the `gh-aw` GitHub CLI extension locally to author and compile
-workflows:
-
-```bash
-gh extension install githubnext/gh-aw
-gh aw compile             # regenerate all .lock.yml files after editing a workflow
-```
-
-Each workflow lives at `.github/workflows/<name>.md` and is committed
-alongside its generated `.lock.yml` file (the file GitHub Actions actually
-runs). Both files must be committed.
-
-### Required secret
-
-| Secret | Purpose |
-|--------|---------|
-| `COPILOT_GITHUB_TOKEN` | Token used by the gh-aw Copilot CLI engine. Configure in repository **Settings → Secrets and variables → Actions**. Never commit the value. |
-
-### Documentation Maintainer
-
-**File:** `.github/workflows/docs-maintainer.md`
-**Engine:** GitHub Copilot CLI (gh-aw default)
-**Schedule:** daily at 06:00 UTC, plus manual `workflow_dispatch`
-
-The agent compares recent `main`-branch commits (the last 24 hours, capped
-at the 50 most recent commits) against `docs/spec.md`, `docs/tech.md`, and
-`README.md`, and:
-
-- Opens **at most one draft pull request** per run when a single doc file
-  needs ≤ 30 lines of mechanical edits (renamed env var, new API route to
-  list, updated CLI command, stale path, broken link). PRs are titled with
-  the `[docs]` prefix, labeled `documentation` and `agentic`, and use a
-  branch under `agent/docs-maintainer/`. The safe-output gate enforces an
-  `allowed-files` allow-list so the PR can only modify the three target
-  doc files.
-- Files **at most two issues** per run (titled `[docs-drift] ...`, same
-  labels) when drift is structural, conceptual, or larger than the PR
-  threshold.
-- Excludes `docs/adr/**` (immutable ADRs), `docs/backlog.md` (human-owned),
-  and all generated/lock files from analysis.
-- Runs gh-aw's built-in threat-detection job before any safe output is
-  applied; flagged output blocks the workflow.
-
-**Trigger manually:** Actions tab → *Documentation Maintainer* → **Run
-workflow** (or `gh workflow run docs-maintainer.lock.yml`).
-
-**Disable:** Actions tab → *Documentation Maintainer* → **Disable
-workflow**, or run `gh aw disable docs-maintainer`. To remove permanently,
-delete `.github/workflows/docs-maintainer.md` and `.lock.yml`.
-
-**Interpreting outputs:**
-
-- A `[docs]`-prefixed draft PR → review like any small docs PR; merge if
-  the change is correct.
-- A `[docs-drift]`-prefixed issue → human or follow-up agent triages and
-  schedules the larger doc update.
-- No PR or issue → the agent found no actionable drift in the analysis
-  window.
-
-The workflow runs only on `schedule` and `workflow_dispatch`, so pull
-request events (including PRs from forks) cannot trigger it. The required
-`COPILOT_GITHUB_TOKEN` secret is also not available on forks.
