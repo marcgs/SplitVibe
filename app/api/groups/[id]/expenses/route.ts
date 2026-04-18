@@ -103,6 +103,7 @@ export async function POST(
   const expense = await db.expense.create({
     data: {
       groupId,
+      createdById: session.user.id,
       description: title,
       amount,
       currency: "USD",

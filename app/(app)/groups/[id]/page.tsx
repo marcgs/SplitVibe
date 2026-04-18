@@ -9,6 +9,7 @@ import ExpenseForm from "./expense-form";
 import SettlementForm from "./settlement-form";
 import DeleteSettlementButton from "./delete-settlement-button";
 import ExpenseAttachments from "./expense-attachments";
+import ExpenseActions from "./expense-actions";
 
 export default async function GroupDetailPage({
   params,
@@ -19,6 +20,7 @@ export default async function GroupDetailPage({
   if (!session?.user?.id) {
     notFound();
   }
+  const sessionUserId = session.user.id;
 
   const { id } = await params;
 
@@ -237,6 +239,18 @@ export default async function GroupDetailPage({
                     expenseId={expense.id}
                     attachments={expense.attachments}
                   />
+                  {expense.createdById === sessionUserId && (
+                    <ExpenseActions
+                      expenseId={expense.id}
+                      groupId={group.id}
+                      members={group.members}
+                      initialTitle={expense.description}
+                      initialAmount={Number(expense.amount)}
+                      initialPaidBy={expense.payers[0]?.userId ?? sessionUserId}
+                      initialSplitAmong={expense.splits.map((s) => s.userId)}
+                      initialDate={new Date(expense.date).toISOString().split("T")[0]}
+                    />
+                  )}
                 </div>
               ))}
             </div>
