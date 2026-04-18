@@ -145,69 +145,15 @@ Execute each criterion using its assigned strategy:
 ### 8. Post results to the PR
 
 After producing the validation report, **post it as a comment on the
-PR in GitHub** containing the full report from step 7.
+PR in GitHub**. Use the GitHub API (or the available GitHub MCP tools)
+to add an issue comment on the pull request with the full report from
+step 6.
 
-#### Authentication
-
-The default token available to the cloud Copilot agent (and to the
-out-of-the-box `github` MCP server) is **read-only on pull requests** —
-attempting to comment with it returns
-`GraphQL: Resource not accessible by integration (addComment)` /
-`HTTP 403`.
-
-A repo-scoped fine-grained PAT with **Pull requests: Read and write** is
-exposed to the agent's runtime as the `COPILOT_PAT` environment variable
-via the `copilot` GitHub Actions environment. **Always use this token
-when posting to the PR**, never the default `gh` / MCP credentials.
-
-#### How to post
-
-Prefer `gh` over raw `curl` so the body is escaped correctly. Write the
-report to a file first to avoid shell-quoting issues with the markdown
-table:
-
-```bash
-# Write the full report (table + summary + conclusion) to a file.
-cat > /tmp/validation-report.md <<'EOF'
-## Validation Report — PR #<number>
-... (full report from step 7) ...
-EOF
-
-# Look for an existing validation comment from a previous run.
-existing_id=$(GH_TOKEN="$COPILOT_PAT" gh pr view <pr-number> \
-  --repo marcgs/SplitVibe --json comments \
-  --jq '.comments[] | select(.body | startswith("## Validation Report — PR #")) | .id' \
-  | head -n 1)
-
-if [ -n "$existing_id" ]; then
-  # Update the existing comment in place.
-  GH_TOKEN="$COPILOT_PAT" gh api \
-    --method PATCH \
-    "/repos/marcgs/SplitVibe/issues/comments/$existing_id" \
-    -f body="$(cat /tmp/validation-report.md)"
-else
-  # Create a new comment.
-  GH_TOKEN="$COPILOT_PAT" gh pr comment <pr-number> \
-    --repo marcgs/SplitVibe \
-    --body-file /tmp/validation-report.md
-fi
-```
-
-Notes:
-
-- Always pass the token as `GH_TOKEN="$COPILOT_PAT"` on the command line —
-  do not rely on `gh auth login`, and do not call the `github` MCP server
-  for write operations (it uses the read-only token).
-- If `$COPILOT_PAT` is unset (e.g. when the agent is invoked from a
-  local Copilot CLI / Claude Code session that already has a personal
-  `gh auth` token), fall back to plain `gh pr comment …` without the
-  `GH_TOKEN=` prefix.
-- The comment must contain the complete report table, summary, and
-  conclusion so reviewers can see the validation status directly in the
-  PR timeline without re-running the agent.
-- If a previous validation comment exists, **update it** rather than
-  creating a duplicate (the snippet above does this automatically by
-  matching the `## Validation Report — PR #` prefix).
+- If a previous validation comment from this agent already exists on
+  the PR, **update it** instead of creating a duplicate.
+- The comment should contain the complete report table, summary, and
+  conclusion so that reviewers can see the validation status directly
+  in the PR timeline without re-running the agent.
 
 ### 9. Tear down the dev environment
 

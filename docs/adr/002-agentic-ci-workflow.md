@@ -30,7 +30,7 @@ Triggered by assigning a GitHub issue to Copilot (or invoking the implement agen
 
 1. The **implement** agent reads the issue, creates a feature branch, implements via TDD, runs its own validation loop, and opens a PR with `Closes #N`.
 2. In Step 9, the implement agent invokes the **validate-pr** custom agent within the same coding agent session (via the `agent` / `Task` tool — see [Custom agents reference](https://docs.github.com/en/copilot/reference/custom-agents-configuration#tool-aliases)). This runs in a full VM with Docker, git, npm, and Playwright MCP — providing complete E2E acceptance-criteria validation.
-3. The validation report is posted as a comment on the PR by validate-pr Step 8, authenticated with the `COPILOT_PAT` fine-grained PAT (see [Operational requirements](#operational-requirements)).
+3. The validation report is posted as a comment on the PR by validate-pr Step 8, authenticated with a fine-grained PAT exposed as `GH_TOKEN` (see [Operational requirements](#operational-requirements)).
 
 ### Layer 2 — Deterministic CI (GitHub Actions)
 
@@ -64,7 +64,7 @@ Current workarounds for re-validation:
   │  implement agent                    │
   │  (TDD + self-check)                 │
   │  Step 9: validate-pr custom agent   │
-  │  → posts report on PR (COPILOT_PAT) │
+  │  → posts report on PR (GH_TOKEN PAT) │
   └──────────┬─────────────────────────┘
              │ Opens PR
              ▼
@@ -87,7 +87,7 @@ Current workarounds for re-validation:
 
 ## Operational requirements
 
-### `COPILOT_PAT` in the `copilot` GitHub Actions environment
+### Fine-grained PAT exposed as `GH_TOKEN` in the `copilot` environment
 
 Validate-pr Step 8 posts the validation report as a PR comment. The cloud
 Copilot agent's default token (and the out-of-the-box `github` MCP
@@ -96,20 +96,22 @@ return `GraphQL: Resource not accessible by integration (addComment)` /
 HTTP 403.
 
 To enable comment posting, a fine-grained PAT is exposed to the agent
-runtime as the `COPILOT_PAT` environment variable:
+runtime as the **`GH_TOKEN`** environment variable. `gh` reads
+`GH_TOKEN` automatically, so any `gh pr comment …` call in the agent's
+shell will use the PAT with no further configuration.
 
 | Item | Value |
 |---|---|
 | PAT type | Fine-grained, repository-scoped to `marcgs/SplitVibe` |
 | PAT permissions | `Pull requests: Read and write`, `Contents: Read`, `Metadata: Read` |
-| Stored as | Environment secret named `COPILOT_PAT` |
+| Stored as | Environment secret named `GH_TOKEN` |
 | Stored in | The **`copilot`** GitHub Actions environment ([Settings → Environments → `copilot`](https://github.com/marcgs/SplitVibe/settings/environments)) |
 
 > **Important:** The cloud Copilot agent only injects secrets from the
 > `copilot` environment into its runtime — **not** repository-level
 > Actions secrets. See
 > [Setting environment variables in Copilot's environment](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/customize-the-agent-environment#setting-environment-variables-in-copilots-environment).
-> A `COPILOT_PAT` secret stored at the repository level is silently
+> A `GH_TOKEN` secret stored at the repository level is silently
 > invisible to the agent.
 
 PR comments will be authored by the PAT owner (a real GitHub user), not
