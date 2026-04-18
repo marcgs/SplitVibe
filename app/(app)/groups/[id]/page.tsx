@@ -9,6 +9,7 @@ import ExpenseForm from "./expense-form";
 import SettlementForm from "./settlement-form";
 import DeleteSettlementButton from "./delete-settlement-button";
 import ExpenseAttachments from "./expense-attachments";
+import ExpenseActions from "./expense-actions";
 
 export default async function GroupDetailPage({
   params,
@@ -236,6 +237,12 @@ export default async function GroupDetailPage({
                   <ExpenseAttachments
                     expenseId={expense.id}
                     attachments={expense.attachments}
+                  />
+                  <ExpenseActions
+                    expenseId={expense.id}
+                    initialTitle={expense.description}
+                    initialAmount={Number(expense.amount)}
+                    canModify={expense.createdById === session.user?.id}
                   />
                 </div>
               ))}
