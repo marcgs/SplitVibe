@@ -74,8 +74,10 @@ Read the current state of these documentation files:
 
 Then inspect recent changes on the default branch (`main`):
 
-- The diff of commits from the **last 24 hours**, OR the **last 50 commits**,
-  whichever covers fewer commits.
+- The diff of commits **from the last 24 hours**, capped at the **50 most
+  recent commits**. (If more than 50 commits landed in the last 24 hours,
+  only analyse the most recent 50; if fewer commits landed, analyse only
+  those that fall inside the 24-hour window.)
 - Use the GitHub MCP tools (`list_commits`, `get_commit`, `get_pull_request`,
   `get_pull_request_files`) and read-only repo access to gather context.
 
@@ -110,11 +112,24 @@ The PR must:
   `README.md`). Never touch any other path.
 - Be a draft, with `[docs] ` title prefix and labels `documentation`,
   `agentic`. (gh-aw enforces these.)
-- Use a branch name under the `agent/docs-maintainer/` prefix
-  (e.g. `agent/docs-maintainer/sync-env-vars`). Pass this as the `branch`
-  field when calling the `create_pull_request` safe-output tool.
-- Cap at **1 PR per run** even if you find multiple small fixes — pick the
-  highest-value one and file the rest as issues if needed.
+- Use a branch name under the `agent/docs-maintainer/` prefix, followed by
+  a short kebab-case slug describing the change
+  (e.g. `agent/docs-maintainer/sync-env-vars`,
+  `agent/docs-maintainer/fix-readme-cli-command`). Keep the slug ≤ 40
+  characters, lowercase, and use only `[a-z0-9-]`. Do **not** include
+  timestamps, run numbers, or PR numbers — gh-aw appends a unique salt
+  automatically. Pass the full branch name as the `branch` field when
+  calling the `create_pull_request` safe-output tool.
+- Cap at **1 PR per run** even if you find multiple small fixes. When
+  choosing which fix to ship, prioritise in this order:
+  1. Broken or wrong information that would mislead a user (e.g. a stale
+     CLI command in `README.md`, a wrong env var name, a broken internal
+     link).
+  2. User-facing surfaces (`README.md`) over internal specs.
+  3. Newly added public API routes / env vars missing from the docs.
+  4. Pure typos and formatting last.
+  File any remaining small fixes as `[docs-drift]` issues (subject to the
+  2-issue cap) so they are not lost.
 
 **Open an issue when ANY of the following hold:**
 

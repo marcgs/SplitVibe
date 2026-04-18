@@ -214,8 +214,9 @@ runs). Both files must be committed.
 **Engine:** GitHub Copilot CLI (gh-aw default)
 **Schedule:** daily at 06:00 UTC, plus manual `workflow_dispatch`
 
-The agent compares recent `main`-branch commits (last 24 h, capped at 50
-commits) against `docs/spec.md`, `docs/tech.md`, and `README.md`, and:
+The agent compares recent `main`-branch commits (the last 24 hours, capped
+at the 50 most recent commits) against `docs/spec.md`, `docs/tech.md`, and
+`README.md`, and:
 
 - Opens **at most one draft pull request** per run when a single doc file
   needs ≤ 30 lines of mechanical edits (renamed env var, new API route to
