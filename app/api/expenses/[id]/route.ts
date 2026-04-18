@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 
-const createExpenseSchema = z.object({
+const updateExpenseSchema = z.object({
   title: z.string().min(1).max(200),
   amount: z.number().positive(),
   paidBy: z.string().min(1),
@@ -13,7 +13,7 @@ const createExpenseSchema = z.object({
   }),
 });
 
-export async function POST(
+export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -22,16 +22,18 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: groupId } = await params;
+  const { id: expenseId } = await params;
 
-  // Check membership
-  const membership = await db.groupMember.findUnique({
-    where: {
-      groupId_userId: { groupId, userId: session.user.id },
-    },
+  const expense = await db.expense.findUnique({
+    where: { id: expenseId },
+    select: { id: true, groupId: true, createdById: true, deletedAt: true },
   });
 
-  if (!membership) {
+  if (!expense || expense.deletedAt !== null) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (expense.createdById !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -42,7 +44,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = createExpenseSchema.safeParse(body);
+  const parsed = updateExpenseSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", details: parsed.error.flatten() },
@@ -54,7 +56,7 @@ export async function POST(
 
   // Verify paidBy and all splitAmong users are group members
   const groupMembers = await db.groupMember.findMany({
-    where: { groupId },
+    where: { groupId: expense.groupId },
     include: { user: { select: { id: true, name: true, email: true } } },
   });
 
@@ -82,7 +84,7 @@ export async function POST(
   const baseSplitCents = Math.floor(amountCents / participantCount);
   const remainderCents = amountCents - baseSplitCents * participantCount;
 
-  // Sort participants alphabetically by name (then email) to determine who gets remainder
+  // Sort participants alphabetically by name (then email) to determine remainder
   const participantMembers = groupMembers
     .filter((m) => splitAmong.includes(m.userId))
     .sort((a, b) => {
@@ -100,39 +102,35 @@ export async function POST(
     };
   });
 
-  const expense = await db.expense.create({
-    data: {
-      groupId,
-      createdById: session.user.id,
-      description: title,
-      amount,
-      currency: "USD",
-      splitMode: "EQUAL",
-      date: new Date(date),
-      payers: {
-        create: {
-          userId: paidBy,
-          amount,
+  // Atomically replace payers and splits, and update expense fields
+  const updated = await db.$transaction(async (tx) => {
+    await tx.expensePayer.deleteMany({ where: { expenseId } });
+    await tx.expenseSplit.deleteMany({ where: { expenseId } });
+
+    return tx.expense.update({
+      where: { id: expenseId },
+      data: {
+        description: title,
+        amount,
+        date: new Date(date),
+        payers: { create: { userId: paidBy, amount } },
+        splits: { create: splitData },
+      },
+      include: {
+        payers: {
+          include: { user: { select: { id: true, name: true, email: true } } },
+        },
+        splits: {
+          include: { user: { select: { id: true, name: true, email: true } } },
         },
       },
-      splits: {
-        create: splitData,
-      },
-    },
-    include: {
-      payers: {
-        include: { user: { select: { id: true, name: true, email: true } } },
-      },
-      splits: {
-        include: { user: { select: { id: true, name: true, email: true } } },
-      },
-    },
+    });
   });
 
-  return NextResponse.json(expense, { status: 201 });
+  return NextResponse.json(updated);
 }
 
-export async function GET(
+export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -141,31 +139,25 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: groupId } = await params;
+  const { id: expenseId } = await params;
 
-  // Check membership
-  const membership = await db.groupMember.findUnique({
-    where: {
-      groupId_userId: { groupId, userId: session.user.id },
-    },
+  const expense = await db.expense.findUnique({
+    where: { id: expenseId },
+    select: { id: true, createdById: true, deletedAt: true },
   });
 
-  if (!membership) {
+  if (!expense || expense.deletedAt !== null) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (expense.createdById !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const expenses = await db.expense.findMany({
-    where: { groupId, deletedAt: null },
-    include: {
-      payers: {
-        include: { user: { select: { id: true, name: true, email: true } } },
-      },
-      splits: {
-        include: { user: { select: { id: true, name: true, email: true } } },
-      },
-    },
-    orderBy: { date: "desc" },
+  const deleted = await db.expense.update({
+    where: { id: expenseId },
+    data: { deletedAt: new Date() },
   });
 
-  return NextResponse.json(expenses);
+  return NextResponse.json(deleted);
 }

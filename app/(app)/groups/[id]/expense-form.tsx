@@ -12,21 +12,43 @@ interface Member {
   };
 }
 
+interface ExistingExpense {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  payerId: string;
+  splitUserIds: string[];
+}
+
 interface ExpenseFormProps {
   groupId: string;
   members: Member[];
   currentUserId: string;
+  expense?: ExistingExpense;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export default function ExpenseForm({ groupId, members, currentUserId }: ExpenseFormProps) {
+export default function ExpenseForm({
+  groupId,
+  members,
+  currentUserId,
+  expense,
+  onSuccess,
+  onCancel,
+}: ExpenseFormProps) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paidBy, setPaidBy] = useState(currentUserId);
+  const isEdit = expense !== undefined;
+  const [title, setTitle] = useState(expense?.description ?? "");
+  const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
+  const [paidBy, setPaidBy] = useState(expense?.payerId ?? currentUserId);
   const [splitAmong, setSplitAmong] = useState<string[]>(
-    members.map((m) => m.userId)
+    expense?.splitUserIds ?? members.map((m) => m.userId)
   );
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(
+    expense?.date ?? new Date().toISOString().split("T")[0]
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -44,8 +66,12 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/groups/${groupId}/expenses`, {
-        method: "POST",
+      const url = isEdit
+        ? `/api/expenses/${expense.id}`
+        : `/api/groups/${groupId}/expenses`;
+      const method = isEdit ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
@@ -58,16 +84,21 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error ?? "Failed to create expense");
+        setError(
+          data.error ?? `Failed to ${isEdit ? "update" : "create"} expense`
+        );
         return;
       }
 
-      setTitle("");
-      setAmount("");
-      setPaidBy(currentUserId);
-      setSplitAmong(members.map((m) => m.userId));
-      setDate(new Date().toISOString().split("T")[0]);
+      if (!isEdit) {
+        setTitle("");
+        setAmount("");
+        setPaidBy(currentUserId);
+        setSplitAmong(members.map((m) => m.userId));
+        setDate(new Date().toISOString().split("T")[0]);
+      }
       router.refresh();
+      onSuccess?.();
     } catch {
       setError("Something went wrong");
     } finally {
@@ -182,8 +213,18 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
         disabled={loading || !title.trim() || !amount || splitAmong.length === 0}
         className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
       >
-        {loading ? "Adding…" : "Add Expense"}
+        {loading ? (isEdit ? "Saving…" : "Adding…") : isEdit ? "Save changes" : "Add Expense"}
       </button>
+      {isEdit && onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="w-full rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+        >
+          Cancel
+        </button>
+      )}
     </form>
   );
 }

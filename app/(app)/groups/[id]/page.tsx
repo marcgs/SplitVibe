@@ -6,6 +6,7 @@ import type { ExpenseData, SettlementData } from "@/lib/balances";
 import Link from "next/link";
 import InviteLinkSection from "./invite-link-section";
 import ExpenseForm from "./expense-form";
+import ExpenseActions from "./expense-actions";
 import SettlementForm from "./settlement-form";
 import DeleteSettlementButton from "./delete-settlement-button";
 import ExpenseAttachments from "./expense-attachments";
@@ -19,6 +20,7 @@ export default async function GroupDetailPage({
   if (!session?.user?.id) {
     notFound();
   }
+  const currentUserId = session.user.id;
 
   const { id } = await params;
 
@@ -52,7 +54,7 @@ export default async function GroupDetailPage({
     notFound();
   }
 
-  const currentMember = group.members.find((m) => m.userId === session.user?.id);
+  const currentMember = group.members.find((m) => m.userId === currentUserId);
   if (!currentMember) {
     notFound();
   }
@@ -200,7 +202,7 @@ export default async function GroupDetailPage({
           <ExpenseForm
             groupId={group.id}
             members={group.members}
-            currentUserId={session.user.id}
+            currentUserId={currentUserId}
           />
         </section>
 
@@ -229,8 +231,23 @@ export default async function GroupDetailPage({
                         · {new Date(expense.date).toLocaleDateString()}
                       </div>
                     </div>
-                    <div className="text-sm font-semibold">
-                      ${Number(expense.amount).toFixed(2)}
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm font-semibold">
+                        ${Number(expense.amount).toFixed(2)}
+                      </div>
+                      {expense.createdById === currentUserId && (
+                        <ExpenseActions
+                          groupId={group.id}
+                          expenseId={expense.id}
+                          description={expense.description}
+                          amount={Number(expense.amount)}
+                          date={new Date(expense.date).toISOString().split("T")[0]}
+                          payerId={expense.payers[0]?.userId ?? currentUserId}
+                          splitUserIds={expense.splits.map((s) => s.userId)}
+                          members={group.members}
+                          currentUserId={currentUserId}
+                        />
+                      )}
                     </div>
                   </div>
                   <ExpenseAttachments
@@ -249,7 +266,7 @@ export default async function GroupDetailPage({
           <SettlementForm
             groupId={group.id}
             members={group.members}
-            currentUserId={session.user.id}
+            currentUserId={currentUserId}
           />
         </section>
 
