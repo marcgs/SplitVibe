@@ -15,7 +15,7 @@ export default function DeleteExpenseButton({
   const [error, setError] = useState("");
 
   async function handleDelete() {
-    if (!confirm("Delete this expense? This cannot be undone.")) {
+    if (!confirm("Delete this expense? It will be hidden from the group.")) {
       return;
     }
     setError("");
