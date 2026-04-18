@@ -60,12 +60,12 @@ Current workarounds for re-validation:
   Issue assigned to Copilot
          │
          ▼
-  ┌────────────────────────────────────┐
-  │  implement agent                    │
-  │  (TDD + self-check)                 │
-  │  Step 9: validate-pr custom agent   │
-  │  → posts report on PR (GH_TOKEN PAT) │
-  └──────────┬─────────────────────────┘
+  ┌───────────────────────────────────┐
+  │  implement agent                   │
+  │  (TDD + self-check)                │
+  │  Step 9: validate-pr custom agent  │
+  │  → posts report on PR (via PAT)    │
+  └──────────┬────────────────────────┘
              │ Opens PR
              ▼
   ┌─────────────────────────────────┐
@@ -159,7 +159,7 @@ Same as Approach 2, but the comment is posted using a real-user fine-grained PAT
 **Result:** The coding agent **picked up the mention** (responded within seconds). However, its hardcoded behavior when mentioned on a PR is to **always create a sub-PR** — it opened empty draft PRs (#37, #40) targeting the original PR's branch. Despite explicit instructions ("Do NOT create a new branch or open a new pull request. Only post the validation report as a comment here."), the agent:
 - Created a sub-branch (e.g., `copilot/sub-pr-31-again`)
 - Opened a draft sub-PR
-- Did **not** invoke the validate-pr skill
+- Did **not** invoke the validate-pr custom agent
 - Did **not** post a validation report on the original PR
 
 This appears to be a fundamental design constraint of the Copilot coding agent when triggered via PR comments — it always operates in "implementation mode" (create branch → make changes → open PR), not "comment-only mode."
@@ -216,7 +216,7 @@ The workflow itself would run: `docker compose up` → `npm run dev` → Playwri
 ### Positive
 
 - **Fast feedback** — deterministic CI catches type errors, lint issues, and test failures in minutes on every push.
-- **No secrets required** — CI uses only `GITHUB_TOKEN`. No PAT management or rotation.
+- **Layer 2 needs no secrets** — CI uses only the workflow's built-in `GITHUB_TOKEN`. Layer 1 requires a single fine-grained PAT (`GH_TOKEN` in the `copilot` environment) for posting validation comments — see [Operational requirements](#operational-requirements).
 - **Simple and reliable** — no agentic dependencies, no non-deterministic timing, no sub-PR noise.
 - **E2E validation at implementation time** — the implement agent's Step 9 provides full acceptance-criteria validation (Docker, Playwright, AI reasoning) during the initial implementation cycle.
 - **Visible audit trail** — CI results are standard GitHub status checks. Validation reports from the implement agent are posted as PR comments.
@@ -229,6 +229,7 @@ The workflow itself would run: `docker compose up` → `npm run dev` → Playwri
 ### Risks
 
 - **Regression after post-implementation pushes** — a human or Copilot push that breaks acceptance criteria won't be caught automatically (only CI regressions are caught). Mitigated by human review before merge.
+- **PAT expiration** — the `GH_TOKEN` PAT in the `copilot` environment has a finite expiration (max 1 year for fine-grained PATs). If it lapses, validate-pr Step 8 will start returning HTTP 403 again with no other functional impact. Mitigation: rotate before expiry; the failure mode is loud and obvious in the next implement-agent run.
 - **Platform evolution** — GitHub may add support for coding agent "comment-only" responses or a public API to trigger agent sessions without sub-PRs. When this happens, Layer 3 should be revisited.
 
 ### Deferred Work
