@@ -29,26 +29,37 @@ The container includes Node.js 20, Docker, GitHub CLI, Azure CLI, and Playwright
 
 ## Local Development
 
+All engineering workflows go through the `bin/sv` CLI. Run `bin/sv --help` to list every command.
+
 ```bash
 npm install            # first time only
-bin/dev                # starts docker services, runs migrations, launches dev server
-                       # ctrl+c stops everything and cleans up containers
+bin/sv up              # start backend services (docker + db + migrations)
+bin/sv serve           # start Next.js dev server
+bin/sv down            # tear down backend services and kill port 3000
 ```
 
 ## Testing
 
 ```bash
-bin/test               # unit/integration tests
-bin/test --watch       # watch mode
-bin/test --e2e         # Playwright e2e tests
-bin/test path/to/file  # specific file
+bin/sv test                   # unit/integration tests
+bin/sv test --watch           # watch mode
+bin/sv test --e2e             # Playwright e2e tests
+bin/sv test path/to/file      # specific file
 ```
 
 ## Quality Checks
 
 ```bash
-bin/lint               # typecheck + lint
-bin/check              # full CI gate (typecheck + lint + tests)
+bin/sv lint                   # typecheck + lint (project-wide)
+bin/sv lint path/to/file.ts   # typecheck + lint a single file
+bin/sv check                  # full CI gate (typecheck + lint + tests)
+```
+
+## Documentation
+
+```bash
+bin/sv docs                   # list available doc topics
+bin/sv docs <topic>           # print doc content to stdout
 ```
 
 ## Deployment
@@ -56,10 +67,11 @@ bin/check              # full CI gate (typecheck + lint + tests)
 Deploys to **Azure Container Apps** via GitHub Actions on push to `main`.
 
 ```bash
-bin/infra dev          # provision Azure infrastructure (first time)
-bin/infra prod         # provision prod infrastructure
-bin/deploy dev         # build, push, and deploy app to dev
-bin/deploy prod        # build, push, and deploy app to prod
+bin/sv infra dev       # provision Azure infrastructure (first time)
+bin/sv infra prod      # provision prod infrastructure
+bin/sv deploy dev      # build, push, and deploy app to dev
+bin/sv deploy prod     # build, push, and deploy app to prod
+bin/sv domain dev      # bind custom domain + TLS (dev|prod)
 ```
 
 Required environment variables (set in `.env`):
