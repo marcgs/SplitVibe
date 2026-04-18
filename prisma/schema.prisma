@@ -24,11 +24,12 @@ model User {
 
   accounts     Account[]
   sessions     Session[]
-  groupMembers GroupMember[]
-  paidExpenses ExpensePayer[]
-  splits       ExpenseSplit[]
-  settlements  Settlement[]   @relation("SettlementPayer")
-  receivables  Settlement[]   @relation("SettlementPayee")
+  groupMembers    GroupMember[]
+  paidExpenses    ExpensePayer[]
+  splits          ExpenseSplit[]
+  createdExpenses Expense[]      @relation("ExpenseCreator")
+  settlements     Settlement[]   @relation("SettlementPayer")
+  receivables     Settlement[]   @relation("SettlementPayee")
 }
 
 model Account {
@@ -108,6 +109,7 @@ model GroupMember {
 model Expense {
   id                 String    @id @default(cuid())
   groupId            String
+  createdById        String?
   description        String
   amount             Decimal   @db.Decimal(14, 4)
   currency           String
@@ -122,9 +124,12 @@ model Expense {
   deletedAt          DateTime?
 
   group       Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   User?          @relation("ExpenseCreator", fields: [createdById], references: [id], onDelete: SetNull)
   payers      ExpensePayer[]
   splits      ExpenseSplit[]
   attachments Attachment[]
+
+  @@index([createdById])
 }
 
 model ExpensePayer {

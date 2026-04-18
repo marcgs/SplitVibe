@@ -9,6 +9,7 @@ import ExpenseForm from "./expense-form";
 import SettlementForm from "./settlement-form";
 import DeleteSettlementButton from "./delete-settlement-button";
 import ExpenseAttachments from "./expense-attachments";
+import ExpenseActions from "./expense-actions";
 
 export default async function GroupDetailPage({
   params,
@@ -19,6 +20,7 @@ export default async function GroupDetailPage({
   if (!session?.user?.id) {
     notFound();
   }
+  const userId = session.user.id;
 
   const { id } = await params;
 
@@ -52,7 +54,7 @@ export default async function GroupDetailPage({
     notFound();
   }
 
-  const currentMember = group.members.find((m) => m.userId === session.user?.id);
+  const currentMember = group.members.find((m) => m.userId === userId);
   if (!currentMember) {
     notFound();
   }
@@ -200,7 +202,7 @@ export default async function GroupDetailPage({
           <ExpenseForm
             groupId={group.id}
             members={group.members}
-            currentUserId={session.user.id}
+            currentUserId={userId}
           />
         </section>
 
@@ -237,6 +239,23 @@ export default async function GroupDetailPage({
                     expenseId={expense.id}
                     attachments={expense.attachments}
                   />
+                  {expense.createdById === userId && (
+                    <div className="mt-2">
+                      <ExpenseActions
+                        expenseId={expense.id}
+                        members={group.members}
+                        initialTitle={expense.description}
+                        initialAmount={Number(expense.amount)}
+                        initialPaidBy={
+                          expense.payers[0]?.userId ?? userId
+                        }
+                        initialSplitAmong={expense.splits.map((s) => s.userId)}
+                        initialDate={
+                          new Date(expense.date).toISOString().split("T")[0]
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -249,7 +268,7 @@ export default async function GroupDetailPage({
           <SettlementForm
             groupId={group.id}
             members={group.members}
-            currentUserId={session.user.id}
+            currentUserId={userId}
           />
         </section>
 
