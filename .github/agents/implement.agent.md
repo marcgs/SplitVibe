@@ -137,22 +137,30 @@ Create a pull request on GitHub with:
 
 ### 9. Validate the PR
 
-After the PR is created, invoke the **validate-pr-agent** via the `task`
-tool to verify that all acceptance criteria are met. Copilot CLI custom
-agents are invoked programmatically through the `task` tool with
-`agent_type` — not via `@mention` chat syntax (in Copilot CLI, `@` mentions
-files and `#` mentions issues/PRs).
+After the PR is created, **invoke the `validate-pr-agent` custom agent**
+to verify that all acceptance criteria are met. **This step is mandatory
+— do not proceed to step 10 until validation has been invoked and a
+result is available.**
 
-Example invocation:
+Use whichever tool your runtime exposes for invoking another custom agent:
 
-```
-task(
-  agent_type: "validate-pr-agent",
-  name: "validate-pr",
-  description: "Validate PR acceptance criteria",
-  prompt: "Validate PR #<pr-number> against the linked issue's acceptance criteria."
-)
-```
+- **Copilot CLI:** use the `task` tool with
+  `agent_type: "validate-pr-agent"`. Example:
+  ```
+  task(
+    agent_type: "validate-pr-agent",
+    name: "validate-pr",
+    description: "Validate PR acceptance criteria",
+    prompt: "Validate PR #<pr-number> against the linked issue's acceptance criteria."
+  )
+  ```
+- **Copilot cloud agent (GitHub.com):** use the `agent` tool (also
+  aliased as `Task` / `custom-agent`) and invoke the custom agent named
+  `validate-pr-agent` with the prompt:
+  `"Validate PR #<pr-number> against the linked issue's acceptance criteria."`
+- **Copilot in IDEs (VS Code, JetBrains, etc.):** use the equivalent
+  custom-agent invocation tool exposed by the IDE runtime, naming
+  `validate-pr-agent` and passing the same prompt.
 
 The validate-pr-agent will **post its validation report as a comment on the
 PR** (see validate-pr-agent Step 7). Ensure the full report table, summary, and
@@ -169,6 +177,11 @@ comment already exists, it should be updated rather than duplicated.
   push, and re-validate.
 
 ### 10. Final report
+
+**Do not produce this report until step 9 has actually been executed and
+the validate-pr-agent has returned a result (or definitively failed to
+run).** If validation was not invoked, return to step 9 and invoke it
+before reporting.
 
 ```markdown
 ## Implementation Report — Issue #<number>
@@ -190,3 +203,9 @@ comment already exists, it should be updated rather than duplicated.
 ### PR: #<pr-number> — <pr-title>
 ### Validation: ✅ All acceptance criteria verified
 ```
+
+The `Validation` row and the final `Validation:` line **must** reflect
+the actual outcome returned by validate-pr-agent in step 9. If the
+validate-pr-agent could not be invoked in this runtime, mark the row
+⚠️ and explain which custom-agent invocation tool was missing — do not
+silently report success.
