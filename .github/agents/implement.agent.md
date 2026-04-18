@@ -162,10 +162,6 @@ Use whichever tool your runtime exposes for invoking another custom agent:
   custom-agent invocation tool exposed by the IDE runtime, naming
   `validate-pr-agent` and passing the same prompt.
 
-Note: in Copilot CLI, `@` mentions files and `#` mentions issues/PRs —
-custom agents are **not** invoked via `@mention` chat syntax in any
-runtime. Always invoke them through the runtime's custom-agent tool.
-
 The validate-pr-agent will **post its validation report as a comment on the
 PR** (see validate-pr-agent Step 7). Ensure the full report table, summary, and
 conclusion are visible in the PR timeline so reviewers can see the
