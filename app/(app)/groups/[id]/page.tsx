@@ -9,6 +9,7 @@ import ExpenseForm from "./expense-form";
 import SettlementForm from "./settlement-form";
 import DeleteSettlementButton from "./delete-settlement-button";
 import ExpenseAttachments from "./expense-attachments";
+import ExpenseActions from "./expense-actions";
 
 export default async function GroupDetailPage({
   params,
@@ -57,6 +58,7 @@ export default async function GroupDetailPage({
     notFound();
   }
 
+  const currentUserId = currentMember.userId;
   const isAdmin = currentMember.role === "admin";
 
   // Fetch settlements for balance calculation and display
@@ -220,7 +222,7 @@ export default async function GroupDetailPage({
                   key={expense.id}
                   className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex-1">
                       <div className="text-sm font-medium">{expense.description}</div>
                       <div className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -229,8 +231,23 @@ export default async function GroupDetailPage({
                         · {new Date(expense.date).toLocaleDateString()}
                       </div>
                     </div>
-                    <div className="text-sm font-semibold">
-                      ${Number(expense.amount).toFixed(2)}
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm font-semibold">
+                        ${Number(expense.amount).toFixed(2)}
+                      </div>
+                      {expense.createdById === currentUserId && (
+                        <ExpenseActions
+                          expenseId={expense.id}
+                          groupMembers={group.members}
+                          initialTitle={expense.description}
+                          initialAmount={Number(expense.amount)}
+                          initialPaidBy={expense.payers[0]?.userId ?? currentUserId}
+                          initialSplitAmong={expense.splits.map((s) => s.userId)}
+                          initialDate={
+                            new Date(expense.date).toISOString().split("T")[0]
+                          }
+                        />
+                      )}
                     </div>
                   </div>
                   <ExpenseAttachments
