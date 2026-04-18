@@ -1,5 +1,5 @@
 ---
-name: implement
+name: implement-agent
 description: >
   Implements a GitHub issue (story) end-to-end following the project's TDD
   workflow, opens a pull request, and then invokes the validate-pr agent to
@@ -137,15 +137,25 @@ Create a pull request on GitHub with:
 
 ### 9. Validate the PR
 
-After the PR is created, invoke the **validate-pr** agent to verify that
-all acceptance criteria are met:
+After the PR is created, invoke the **validate-pr-agent** via the `task`
+tool to verify that all acceptance criteria are met. Copilot CLI custom
+agents are invoked programmatically through the `task` tool with
+`agent_type` — not via `@mention` chat syntax (in Copilot CLI, `@` mentions
+files and `#` mentions issues/PRs).
+
+Example invocation:
 
 ```
-@validate-pr PR #<pr-number>
+task(
+  agent_type: "validate-pr-agent",
+  name: "validate-pr",
+  description: "Validate PR acceptance criteria",
+  prompt: "Validate PR #<pr-number> against the linked issue's acceptance criteria."
+)
 ```
 
-The validate-pr agent will **post its validation report as a comment on the
-PR** (see validate-pr Step 7). Ensure the full report table, summary, and
+The validate-pr-agent will **post its validation report as a comment on the
+PR** (see validate-pr-agent Step 7). Ensure the full report table, summary, and
 conclusion are visible in the PR timeline so reviewers can see the
 validation status without re-running the agent. If a previous validation
 comment already exists, it should be updated rather than duplicated.
