@@ -1,5 +1,5 @@
 ---
-name: validate-pr
+name: validate-pr-agent
 description: >
   Validates a PR's acceptance criteria from the user's perspective using
   browser-based E2E tests (Playwright MCP) and API calls. Reads the linked
