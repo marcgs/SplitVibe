@@ -29,8 +29,8 @@ We need a workflow that:
 Triggered by assigning a GitHub issue to Copilot (or invoking the implement agent manually).
 
 1. The **implement** agent reads the issue, creates a feature branch, implements via TDD, runs its own validation loop, and opens a PR with `Closes #N`.
-2. In Step 9, the implement agent invokes the **validate-pr** skill within the same coding agent session. This runs in a full VM with Docker, git, npm, and Playwright MCP — providing complete E2E acceptance-criteria validation.
-3. The validation report is posted as a comment on the PR.
+2. In Step 9, the implement agent invokes the **validate-pr** custom agent within the same coding agent session (via the `agent` / `Task` tool — see [Custom agents reference](https://docs.github.com/en/copilot/reference/custom-agents-configuration#tool-aliases)). This runs in a full VM with Docker, git, npm, and Playwright MCP — providing complete E2E acceptance-criteria validation.
+3. The validation report is posted as a comment on the PR by validate-pr Step 8, authenticated with a fine-grained PAT exposed as `GH_TOKEN` (see [Operational requirements](#operational-requirements)).
 
 ### Layer 2 — Deterministic CI (GitHub Actions)
 
@@ -60,12 +60,12 @@ Current workarounds for re-validation:
   Issue assigned to Copilot
          │
          ▼
-  ┌──────────────────────────┐
-  │  implement agent          │
-  │  (TDD + self-check)       │
-  │  Step 9: validate-pr skill│
-  │  → posts report on PR     │
-  └──────────┬───────────────┘
+  ┌───────────────────────────────────┐
+  │  implement agent                   │
+  │  (TDD + self-check)                │
+  │  Step 9: validate-pr custom agent  │
+  │  → posts report on PR (via PAT)    │
+  └──────────┬────────────────────────┘
              │ Opens PR
              ▼
   ┌─────────────────────────────────┐
@@ -82,6 +82,41 @@ Current workarounds for re-validation:
     check      human review
     fails PR
 ```
+
+---
+
+## Operational requirements
+
+### Fine-grained PAT exposed as `GH_TOKEN` in the `copilot` environment
+
+Validate-pr Step 8 posts the validation report as a PR comment. The cloud
+Copilot agent's default token (and the out-of-the-box `github` MCP
+server's token) is **read-only on pull requests** — attempts to comment
+return `GraphQL: Resource not accessible by integration (addComment)` /
+HTTP 403.
+
+To enable comment posting, a fine-grained PAT is exposed to the agent
+runtime as the **`GH_TOKEN`** environment variable. `gh` reads
+`GH_TOKEN` automatically, so any `gh pr comment …` call in the agent's
+shell will use the PAT with no further configuration.
+
+| Item | Value |
+|---|---|
+| PAT type | Fine-grained, repository-scoped to `marcgs/SplitVibe` |
+| PAT permissions | `Pull requests: Read and write`, `Contents: Read`, `Metadata: Read` |
+| Stored as | Environment secret named `GH_TOKEN` |
+| Stored in | The **`copilot`** GitHub Actions environment ([Settings → Environments → `copilot`](https://github.com/marcgs/SplitVibe/settings/environments)) |
+
+> **Important:** The cloud Copilot agent only injects secrets from the
+> `copilot` environment into its runtime — **not** repository-level
+> Actions secrets. See
+> [Setting environment variables in Copilot's environment](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/customize-the-agent-environment#setting-environment-variables-in-copilots-environment).
+> A `GH_TOKEN` secret stored at the repository level is silently
+> invisible to the agent.
+
+PR comments will be authored by the PAT owner (a real GitHub user), not
+by `copilot-swe-agent[bot]`. Rotate the PAT before its expiration to
+avoid a sudden return of HTTP 403 on validation runs.
 
 ---
 
@@ -124,7 +159,7 @@ Same as Approach 2, but the comment is posted using a real-user fine-grained PAT
 **Result:** The coding agent **picked up the mention** (responded within seconds). However, its hardcoded behavior when mentioned on a PR is to **always create a sub-PR** — it opened empty draft PRs (#37, #40) targeting the original PR's branch. Despite explicit instructions ("Do NOT create a new branch or open a new pull request. Only post the validation report as a comment here."), the agent:
 - Created a sub-branch (e.g., `copilot/sub-pr-31-again`)
 - Opened a draft sub-PR
-- Did **not** invoke the validate-pr skill
+- Did **not** invoke the validate-pr custom agent
 - Did **not** post a validation report on the original PR
 
 This appears to be a fundamental design constraint of the Copilot coding agent when triggered via PR comments — it always operates in "implementation mode" (create branch → make changes → open PR), not "comment-only mode."
@@ -181,7 +216,7 @@ The workflow itself would run: `docker compose up` → `npm run dev` → Playwri
 ### Positive
 
 - **Fast feedback** — deterministic CI catches type errors, lint issues, and test failures in minutes on every push.
-- **No secrets required** — CI uses only `GITHUB_TOKEN`. No PAT management or rotation.
+- **Layer 2 needs no secrets** — CI uses only the workflow's built-in `GITHUB_TOKEN`. Layer 1 requires a single fine-grained PAT (`GH_TOKEN` in the `copilot` environment) for posting validation comments — see [Operational requirements](#operational-requirements).
 - **Simple and reliable** — no agentic dependencies, no non-deterministic timing, no sub-PR noise.
 - **E2E validation at implementation time** — the implement agent's Step 9 provides full acceptance-criteria validation (Docker, Playwright, AI reasoning) during the initial implementation cycle.
 - **Visible audit trail** — CI results are standard GitHub status checks. Validation reports from the implement agent are posted as PR comments.
@@ -194,6 +229,7 @@ The workflow itself would run: `docker compose up` → `npm run dev` → Playwri
 ### Risks
 
 - **Regression after post-implementation pushes** — a human or Copilot push that breaks acceptance criteria won't be caught automatically (only CI regressions are caught). Mitigated by human review before merge.
+- **PAT expiration** — the `GH_TOKEN` PAT in the `copilot` environment has a finite expiration (max 1 year for fine-grained PATs). If it lapses, validate-pr Step 8 will start returning HTTP 403 again with no other functional impact. Mitigation: rotate before expiry; the failure mode is loud and obvious in the next implement-agent run.
 - **Platform evolution** — GitHub may add support for coding agent "comment-only" responses or a public API to trigger agent sessions without sub-PRs. When this happens, Layer 3 should be revisited.
 
 ### Deferred Work
