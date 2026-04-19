@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { calculateBalances } from "@/lib/balances";
 import type { ExpenseData, SettlementData } from "@/lib/balances";
 import { getCachedRate } from "@/lib/fx";
+import { Prisma } from "@prisma/client";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -39,7 +40,7 @@ export default async function DashboardPage() {
 
   const settlementsByGroup = new Map<
     string,
-    { payerId: string; payeeId: string; amount: unknown }[]
+    { payerId: string; payeeId: string; amount: Prisma.Decimal }[]
   >();
   if (groups.length > 0) {
     const allSettlements = await db.settlement.findMany({

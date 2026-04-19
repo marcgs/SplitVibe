@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface Member {
@@ -48,6 +48,11 @@ export default function ExpenseForm({ groupId, members, currentUserId, baseCurre
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const currencyOptions = useMemo(
+    () => Array.from(new Set([baseCurrency, currency, ...COMMON_CURRENCIES])),
+    [baseCurrency, currency]
+  );
 
   function toggleSplitMember(userId: string) {
     setSplitAmong((prev) =>
@@ -143,13 +148,11 @@ export default function ExpenseForm({ groupId, members, currentUserId, baseCurre
             onChange={(e) => setCurrency(e.target.value)}
             className="rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           >
-            {Array.from(new Set([baseCurrency, currency, ...COMMON_CURRENCIES])).map(
-              (code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              )
-            )}
+            {currencyOptions.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
           </select>
         </div>
         {currency !== baseCurrency && (
