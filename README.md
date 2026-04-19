@@ -11,22 +11,6 @@ Shared expense tracking for friends and family. Create groups, add expenses with
 - [Docker](https://www.docker.com/) and Docker Compose
 - Node.js 20+
 
-## Dev Container (recommended)
-
-Open in VS Code and select **Reopen in Container**, or from the terminal:
-
-```bash
-devcontainer up --workspace-folder .
-
-# Claude Code
-devcontainer exec --workspace-folder . claude
-
-# GitHub Copilot
-devcontainer exec --workspace-folder . gh copilot
-```
-
-The container includes Node.js 20, Docker, GitHub CLI, Azure CLI, and Playwright. Services (PostgreSQL, Azurite) start automatically. All `bin/sv` commands work inside the container.
-
 ## Local Development
 
 All engineering workflows go through the `bin/sv` CLI. Run `bin/sv --help` to list every command.
