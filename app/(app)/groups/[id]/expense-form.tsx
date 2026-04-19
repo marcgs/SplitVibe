@@ -16,12 +16,31 @@ interface ExpenseFormProps {
   groupId: string;
   members: Member[];
   currentUserId: string;
+  baseCurrency: string;
 }
 
-export default function ExpenseForm({ groupId, members, currentUserId }: ExpenseFormProps) {
+const COMMON_CURRENCIES = [
+  "USD",
+  "EUR",
+  "GBP",
+  "JPY",
+  "CHF",
+  "CAD",
+  "AUD",
+  "CNY",
+  "SEK",
+  "NOK",
+  "DKK",
+  "INR",
+  "BRL",
+  "MXN",
+];
+
+export default function ExpenseForm({ groupId, members, currentUserId, baseCurrency }: ExpenseFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState(baseCurrency);
   const [paidBy, setPaidBy] = useState(currentUserId);
   const [splitAmong, setSplitAmong] = useState<string[]>(
     members.map((m) => m.userId)
@@ -50,6 +69,7 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
         body: JSON.stringify({
           title,
           amount: parseFloat(amount),
+          currency,
           paidBy,
           splitAmong,
           date,
@@ -64,6 +84,7 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
 
       setTitle("");
       setAmount("");
+      setCurrency(baseCurrency);
       setPaidBy(currentUserId);
       setSplitAmong(members.map((m) => m.userId));
       setDate(new Date().toISOString().split("T")[0]);
@@ -101,19 +122,41 @@ export default function ExpenseForm({ groupId, members, currentUserId }: Expense
           htmlFor="expense-amount"
           className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
         >
-          Amount (USD)
+          Amount
         </label>
-        <input
-          id="expense-amount"
-          type="number"
-          required
-          min="0.01"
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
+        <div className="flex gap-2">
+          <input
+            id="expense-amount"
+            type="number"
+            required
+            min="0.01"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          />
+          <select
+            id="expense-currency"
+            aria-label="Currency"
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          >
+            {Array.from(new Set([baseCurrency, currency, ...COMMON_CURRENCIES])).map(
+              (code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+        {currency !== baseCurrency && (
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Will be converted to {baseCurrency} using today&apos;s cached rate.
+          </p>
+        )}
       </div>
 
       <div>

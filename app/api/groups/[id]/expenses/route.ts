@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getCachedRate } from "@/lib/fx";
 import { z } from "zod";
 
 const createExpenseSchema = z.object({
@@ -11,6 +12,12 @@ const createExpenseSchema = z.object({
   date: z.string().refine((v) => !isNaN(Date.parse(v)), {
     message: "Invalid date",
   }),
+  currency: z
+    .string()
+    .min(3)
+    .max(10)
+    .regex(/^[A-Z]{3,10}$/, { message: "Currency must be an ISO 4217 code" })
+    .optional(),
 });
 
 export async function POST(
@@ -50,7 +57,32 @@ export async function POST(
     );
   }
 
-  const { title, amount, paidBy, splitAmong, date } = parsed.data;
+  const { title, amount, paidBy, splitAmong, date, currency } = parsed.data;
+
+  // Resolve the group's base currency to compute the FX snapshot.
+  const group = await db.group.findUnique({
+    where: { id: groupId },
+    select: { baseCurrency: true },
+  });
+
+  if (!group) {
+    return NextResponse.json({ error: "Group not found" }, { status: 404 });
+  }
+
+  const expenseCurrency = (currency ?? group.baseCurrency).toUpperCase();
+  const fxRate = await getCachedRate(expenseCurrency, group.baseCurrency);
+
+  if (fxRate === null) {
+    return NextResponse.json(
+      {
+        error: `No cached exchange rate available for ${expenseCurrency} → ${group.baseCurrency}. Run the FX refresh and try again.`,
+      },
+      { status: 400 }
+    );
+  }
+
+  const baseCurrencyAmount =
+    Math.round(amount * fxRate * 10000) / 10000;
 
   // Verify paidBy and all splitAmong users are group members
   const groupMembers = await db.groupMember.findMany({
@@ -105,7 +137,9 @@ export async function POST(
       groupId,
       description: title,
       amount,
-      currency: "USD",
+      currency: expenseCurrency,
+      fxRate,
+      baseCurrencyAmount,
       splitMode: "EQUAL",
       date: new Date(date),
       payers: {

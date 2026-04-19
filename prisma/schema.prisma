@@ -14,13 +14,14 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  preferredCurrency String    @default("USD")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   accounts     Account[]
   sessions     Session[]
@@ -80,13 +81,13 @@ enum SplitMode {
 }
 
 model Group {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  currency    String   @default("USD")
-  inviteToken String   @unique @default(cuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  baseCurrency String   @default("USD") @map("currency")
+  inviteToken  String   @unique @default(cuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   members  GroupMember[]
   expenses Expense[]
@@ -190,5 +191,6 @@ model ExchangeRate {
   source     String
   recordedAt DateTime @default(now())
 
+  @@unique([fromCcy, toCcy, recordedAt])
   @@index([fromCcy, toCcy, recordedAt])
 }
