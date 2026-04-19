@@ -51,11 +51,9 @@ bin/sv docs <topic>           # print doc content to stdout
 Deploys to **Azure Container Apps** via GitHub Actions on push to `main`.
 
 ```bash
-bin/sv infra dev       # provision Azure infrastructure (first time)
-bin/sv infra prod      # provision prod infrastructure
-bin/sv deploy dev      # build, push, and deploy app to dev
-bin/sv deploy prod     # build, push, and deploy app to prod
-bin/sv domain dev      # bind custom domain + TLS (dev|prod)
+bin/sv infra [dev|prod]       # provision Azure infrastructure
+bin/sv deploy [dev|prod]      # build, push, and deploy app
+bin/sv domain [dev|prod]      # bind custom domain + TLS (dev|prod)
 ```
 
 Required environment variables (set in `.env`):
