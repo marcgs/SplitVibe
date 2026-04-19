@@ -41,17 +41,22 @@ export async function GET(
     select: { payerId: true, payeeId: true, amount: true },
   });
 
-  // Convert Prisma Decimal to number for pure functions
-  const expenseData: ExpenseData[] = expenses.map((e) => ({
-    payers: e.payers.map((p) => ({
-      userId: p.userId,
-      amount: Number(p.amount),
-    })),
-    splits: e.splits.map((s) => ({
-      userId: s.userId,
-      amount: Number(s.amount),
-    })),
-  }));
+  // Convert Prisma Decimal to number for pure functions. Payer/split amounts
+  // are stored in the expense's original currency, so we apply the FX
+  // snapshot to convert into the group's base currency for balance maths.
+  const expenseData: ExpenseData[] = expenses.map((e) => {
+    const rate = e.fxRate ? Number(e.fxRate) : 1;
+    return {
+      payers: e.payers.map((p) => ({
+        userId: p.userId,
+        amount: Number(p.amount) * rate,
+      })),
+      splits: e.splits.map((s) => ({
+        userId: s.userId,
+        amount: Number(s.amount) * rate,
+      })),
+    };
+  });
 
   const settlementData: SettlementData[] = settlements.map((s) => ({
     payerId: s.payerId,

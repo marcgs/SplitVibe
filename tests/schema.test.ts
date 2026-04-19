@@ -58,6 +58,18 @@ describe("Prisma schema", () => {
     it("has inviteToken field", () => {
       expect(groupFields).toHaveProperty("inviteToken");
     });
+
+    it("has baseCurrency field", () => {
+      expect(groupFields).toHaveProperty("baseCurrency");
+    });
+  });
+
+  describe("User model", () => {
+    const userFields = Prisma.UserScalarFieldEnum;
+
+    it("has preferredCurrency field", () => {
+      expect(userFields).toHaveProperty("preferredCurrency");
+    });
   });
 
   describe("Settlement model", () => {

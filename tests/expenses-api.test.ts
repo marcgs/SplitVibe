@@ -13,9 +13,15 @@ const mockDb = {
     findUnique: vi.fn(),
     findMany: vi.fn(),
   },
+  group: {
+    findUnique: vi.fn(),
+  },
   expense: {
     create: vi.fn(),
     findMany: vi.fn(),
+  },
+  exchangeRate: {
+    findFirst: vi.fn(),
   },
 };
 
@@ -48,6 +54,10 @@ describe("POST /api/groups/[id]/expenses", () => {
     vi.clearAllMocks();
     const authMod = vi.mocked(await import("@/lib/auth"));
     authMod.auth.mockResolvedValue(mockSession as never);
+    // Default: group is in USD; same-currency lookups bypass the FX cache
+    // (getCachedRate returns 1) so existing tests don't need a rate row.
+    mockDb.group.findUnique.mockResolvedValue({ baseCurrency: "USD" });
+    mockDb.exchangeRate.findFirst.mockResolvedValue(null);
   });
 
   it("creates an expense and returns 201", async () => {
@@ -288,6 +298,93 @@ describe("POST /api/groups/[id]/expenses", () => {
       defaultParams
     );
     expect(res.status).toBe(401);
+  });
+
+  // ------- FX / multi-currency ------------------------------------------
+
+  it("snapshots the cached EUR→USD rate on a EUR expense in a USD group", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.group.findUnique.mockResolvedValue({ baseCurrency: "USD" });
+    mockDb.exchangeRate.findFirst.mockResolvedValue({ rate: "1.10" });
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    const res = await POST(
+      jsonRequest({
+        title: "Tapas",
+        amount: 90,
+        currency: "EUR",
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+      }),
+      defaultParams
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockDb.exchangeRate.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { fromCcy: "EUR", toCcy: "USD" },
+      })
+    );
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    expect(createCall.data.currency).toBe("EUR");
+    expect(createCall.data.fxRate).toBe(1.1);
+    expect(createCall.data.baseCurrencyAmount).toBeCloseTo(99, 2);
+  });
+
+  it("returns 400 with a clear error when no cached rate exists for the pair", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.group.findUnique.mockResolvedValue({ baseCurrency: "USD" });
+    mockDb.exchangeRate.findFirst.mockResolvedValue(null);
+
+    const res = await POST(
+      jsonRequest({
+        title: "Tapas",
+        amount: 90,
+        currency: "EUR",
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+      }),
+      defaultParams
+    );
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toMatch(/no cached exchange rate/i);
+    expect(json.error).toContain("EUR");
+    expect(json.error).toContain("USD");
+    expect(mockDb.expense.create).not.toHaveBeenCalled();
+  });
+
+  it("uses fxRate=1 and skips the cache when expense currency equals base currency", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.group.findUnique.mockResolvedValue({ baseCurrency: "USD" });
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    const res = await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        currency: "USD",
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+      }),
+      defaultParams
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockDb.exchangeRate.findFirst).not.toHaveBeenCalled();
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    expect(createCall.data.fxRate).toBe(1);
+    expect(createCall.data.baseCurrencyAmount).toBe(90);
   });
 });
 

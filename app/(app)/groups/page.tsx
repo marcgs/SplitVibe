@@ -23,6 +23,12 @@ export default async function GroupsPage() {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <h1 className="text-xl font-semibold tracking-tight">SplitVibe</h1>
           <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard"
+              className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              Dashboard
+            </Link>
             <span className="text-sm text-zinc-500 dark:text-zinc-400">
               {session?.user?.name}
             </span>

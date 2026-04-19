@@ -69,17 +69,22 @@ export default async function GroupDetailPage({
     orderBy: { date: "desc" },
   });
 
-  // Compute balances and simplified debts
-  const expenseData: ExpenseData[] = group.expenses.map((e) => ({
-    payers: e.payers.map((p) => ({
-      userId: p.userId,
-      amount: Number(p.amount),
-    })),
-    splits: e.splits.map((s) => ({
-      userId: s.userId,
-      amount: Number(s.amount),
-    })),
-  }));
+  // Compute balances and simplified debts (in the group's base currency).
+  // Payer/split amounts are stored in the expense's original currency, so
+  // we convert each by the FX snapshot captured at expense creation.
+  const expenseData: ExpenseData[] = group.expenses.map((e) => {
+    const rate = e.fxRate ? Number(e.fxRate) : 1;
+    return {
+      payers: e.payers.map((p) => ({
+        userId: p.userId,
+        amount: Number(p.amount) * rate,
+      })),
+      splits: e.splits.map((s) => ({
+        userId: s.userId,
+        amount: Number(s.amount) * rate,
+      })),
+    };
+  });
 
   const settlementData: SettlementData[] = settlements.map((s) => ({
     payerId: s.payerId,
@@ -186,7 +191,7 @@ export default async function GroupDetailPage({
                     </span>
                   </div>
                   <div className="text-sm font-semibold">
-                    ${debt.amount.toFixed(2)}
+                    {debt.amount.toFixed(2)} {group.baseCurrency}
                   </div>
                 </div>
               ))}
@@ -201,6 +206,7 @@ export default async function GroupDetailPage({
             groupId={group.id}
             members={group.members}
             currentUserId={session.user.id}
+            baseCurrency={group.baseCurrency}
           />
         </section>
 
@@ -230,7 +236,7 @@ export default async function GroupDetailPage({
                       </div>
                     </div>
                     <div className="text-sm font-semibold">
-                      ${Number(expense.amount).toFixed(2)}
+                      {Number(expense.amount).toFixed(2)} {expense.currency}
                     </div>
                   </div>
                   <ExpenseAttachments
