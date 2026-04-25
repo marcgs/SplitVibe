@@ -156,6 +156,27 @@ describe("POST /api/groups/[id]/expenses", () => {
     expect(payers.amount).toBe(90);
   });
 
+  it("creates an expense with createdById set to the session user", async () => {
+    const { POST } = await import("@/app/api/groups/[id]/expenses/route");
+    mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
+    mockDb.groupMember.findMany.mockResolvedValue(threeMembers);
+    mockDb.expense.create.mockResolvedValue({ id: "exp-1" });
+
+    await POST(
+      jsonRequest({
+        title: "Dinner",
+        amount: 90,
+        paidBy: "user-1",
+        splitAmong: ["user-1", "user-2", "user-3"],
+        date: "2025-06-15",
+      }),
+      defaultParams
+    );
+
+    const createCall = mockDb.expense.create.mock.calls[0][0];
+    expect(createCall.data.createdById).toBe("user-1");
+  });
+
   it("returns 400 when title is missing", async () => {
     const { POST } = await import("@/app/api/groups/[id]/expenses/route");
     mockDb.groupMember.findUnique.mockResolvedValue({ role: "member" });
